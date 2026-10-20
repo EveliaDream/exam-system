@@ -1,0 +1,29 @@
+# ===== 内存库模式（H2）：零外部依赖，适合演示 / 快速验证 / 无 MySQL 环境 =====
+# 启用方式：
+#   .\mvnw spring-boot:run -Dspring-boot.run.profiles=h2
+# 或 IDE 运行配置的 Active profiles 填 h2
+#
+# 特点：进程内数据库，每次重启数据清空并重新写入种子数据（create-drop）。
+# 适合答辩前快速冒烟测试，不适合需要保留数据的场景。
+spring:
+  datasource:
+    url: jdbc:h2:mem:examdb;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+exam:
+  seed:
+    enabled: true

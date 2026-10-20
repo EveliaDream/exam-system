@@ -1,0 +1,66 @@
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### 前端 ###
+frontend/node_modules/
+frontend/dist/
+
+### 本机工具链与构建产物（不属于源码，不要提交）###
+# .tools 内含工作区内的 Maven 本地仓库与 npm 缓存（约 500MB+），
+# 换机器时删掉即可，Maven 会回退到默认的 ~/.m2/repository。
+.tools/
+
+# ---------------------------------------------------------------------------
+# 个人信息保护：以下内容含姓名、学号、教师批注等个人身份信息，禁止提交
+# ---------------------------------------------------------------------------
+# 说明：本文件只写「通用特征」，绝不写真实的姓名或学号
+# —— 否则 .gitignore 本身就把个人信息提交进仓库了。
+#
+# docs/deliverables 存放个人交付物（选题报告、周报、毕设文档等），
+# 其中多个文档的文件名与正文都含真实姓名与学号，因此整个目录不入库。
+# 若需要保留其中可公开的纯文本内容，请脱敏后放到 docs/ 下再提交。
+docs/deliverables/
+
+# 双保险：按特征匹配个人文档，即使被移到别处也不会误提交
+# 11 位以上数字开头的文件名 —— 学生文档常见的「学号-姓名-题目」命名
+[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-*
+*学号-姓名*
+*姓名-*
+【样例】*
+~$*
+
+### 操作系统生成文件 ###
+.DS_Store
+Thumbs.db
+desktop.ini

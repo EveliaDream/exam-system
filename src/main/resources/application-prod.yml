@@ -1,0 +1,26 @@
+# ===== 交付/演示环境：MySQL 8 =====
+# 与 dev 的差别：不打印 SQL、不写演示数据，适合正式演示与答辩。
+#
+# 使用前先建库建表（必须用脚本，别手工建库，否则中文题干会乱码）：
+#   mysql -uroot -p < docs/sql/schema.sql
+#
+# 启动：
+#   .\mvnw spring-boot:run -Dspring-boot.run.profiles=prod
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/exam_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${MYSQL_USERNAME:root}
+    password: ${MYSQL_PASSWORD:admin}
+  jpa:
+    hibernate:
+      # 表结构以 docs/sql/schema.sql 为唯一依据，启动时只校验不修改
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: false
+
+exam:
+  seed:
+    # 生产环境不写演示数据；
+    # 若首次部署确实需要写入演示数据，启动时临时加 --exam.seed.enabled=true（幂等，只会写一次）
+    enabled: false
