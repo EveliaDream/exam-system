@@ -13,4 +13,10 @@ public interface ExamQuestionRepository extends JpaRepository<ExamQuestion, Exam
     long countByExamIdAndAttemptNo(Long examId, Integer attemptNo);
 
     void deleteByExamIdAndAttemptNo(Long examId, Integer attemptNo);
+
+    /** 删除整场考试的所有轮次快照（删除草稿时使用） */
+    void deleteByExamId(Long examId);
+
+    /** 某道题是否已被任何考试引用：题目删除前的保护检查 */
+    long countByQuestionId(Long questionId);
 }

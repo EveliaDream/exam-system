@@ -191,9 +191,9 @@ CREATE TABLE exam
 -- ---------------------------------------------------------------------------
 CREATE TABLE exam_question
 (
+    exam_id     BIGINT      NOT NULL COMMENT '所属考试；必须入主键，否则同一题被两场考试引用会撞主键',
     attempt_no  INT         NOT NULL DEFAULT 1 COMMENT '作答轮次，补考时递增',
     question_id BIGINT      NOT NULL,
-    exam_id     BIGINT      NOT NULL,
     type        ENUM ('SINGLE','MULTIPLE','JUDGE','BLANK') NOT NULL,
     stem        TEXT        NOT NULL,
     options     TEXT,
@@ -201,8 +201,7 @@ CREATE TABLE exam_question
     analysis    TEXT,
     score       INT         NOT NULL COMMENT '该题在本场考试中的分值',
     sort_order  INT         NOT NULL DEFAULT 0,
-    PRIMARY KEY (attempt_no, question_id),
-    KEY idx_eq_exam (exam_id)
+    PRIMARY KEY (exam_id, attempt_no, question_id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='组卷快照';
 

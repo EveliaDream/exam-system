@@ -48,9 +48,27 @@ const routes = [
                 name: 'knowledge-points',
                 component: () => import('@/views/KnowledgePointsView.vue'),
                 meta: { title: '知识点管理', roles: ['TEACHER'] }
+            },
+            {
+                path: 'exams',
+                name: 'exams',
+                component: () => import('@/views/ExamsView.vue'),
+                meta: { title: '考试管理', roles: ['TEACHER'] }
+            },
+            {
+                // 编辑页不放进菜单，只能从考试列表进入
+                path: 'exams/:id',
+                name: 'exam-editor',
+                component: () => import('@/views/ExamEditorView.vue'),
+                meta: { title: '编辑考试', roles: ['TEACHER'] }
+            },
+            {
+                path: 'my-exams',
+                name: 'my-exams',
+                component: () => import('@/views/MyExamsView.vue'),
+                meta: { title: '我的考试', roles: ['STUDENT'] }
             }
-            // 阶段 4 起补充：组卷、考试发布
-            // 阶段 5 起补充（学生）：我的考试、在线作答、我的成绩
+            // 阶段 5 起补充（学生）：在线作答、我的成绩
         ]
     },
     {

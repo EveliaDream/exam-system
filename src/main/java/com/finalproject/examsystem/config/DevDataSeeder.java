@@ -2,6 +2,10 @@ package com.finalproject.examsystem.config;
 
 import com.finalproject.examsystem.domain.Course;
 import com.finalproject.examsystem.domain.Difficulty;
+import com.finalproject.examsystem.domain.Exam;
+import com.finalproject.examsystem.domain.ExamClass;
+import com.finalproject.examsystem.domain.ExamQuestion;
+import com.finalproject.examsystem.domain.ExamStatus;
 import com.finalproject.examsystem.domain.KnowledgePoint;
 import com.finalproject.examsystem.domain.Question;
 import com.finalproject.examsystem.domain.QuestionKnowledge;
@@ -10,6 +14,9 @@ import com.finalproject.examsystem.domain.Role;
 import com.finalproject.examsystem.domain.StudentClass;
 import com.finalproject.examsystem.domain.User;
 import com.finalproject.examsystem.repository.CourseRepository;
+import com.finalproject.examsystem.repository.ExamClassRepository;
+import com.finalproject.examsystem.repository.ExamQuestionRepository;
+import com.finalproject.examsystem.repository.ExamRepository;
 import com.finalproject.examsystem.repository.KnowledgePointRepository;
 import com.finalproject.examsystem.repository.QuestionKnowledgeRepository;
 import com.finalproject.examsystem.repository.QuestionRepository;
@@ -24,6 +31,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -47,6 +56,9 @@ public class DevDataSeeder implements ApplicationRunner {
     private final QuestionRepository questionRepository;
     private final KnowledgePointRepository knowledgePointRepository;
     private final QuestionKnowledgeRepository questionKnowledgeRepository;
+    private final ExamRepository examRepository;
+    private final ExamQuestionRepository examQuestionRepository;
+    private final ExamClassRepository examClassRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -213,6 +225,39 @@ public class DevDataSeeder implements ApplicationRunner {
             }
         }
 
+        // ===== 示例考试：直接以「已发布」状态写入，便于演示学生端 =====
+        // 取前 10 题组卷，总分自动等于这 10 题分值之和（发布时会强校验两者一致）。
+        List<Question> pickedQuestions = questions.subList(0, 10);
+        int examTotal = pickedQuestions.stream().mapToInt(Question::getScore).sum();
+
+        Exam demoExam = new Exam();
+        demoExam.setTitle("Java 程序设计 期中测验（示例）");
+        demoExam.setDescription("演示用考试：含单选、多选、判断、填空四种题型。");
+        demoExam.setCourse(java);
+        demoExam.setTotalScore(examTotal);
+        demoExam.setPassScore(Math.max(1, examTotal * 6 / 10));
+        // 时间窗覆盖当前时刻，学生登录后即可看到「进行中」
+        demoExam.setStartTime(LocalDateTime.now().minusHours(1));
+        demoExam.setEndTime(LocalDateTime.now().plusDays(2));
+        demoExam.setDuration(60);
+        demoExam.setShuffleQuestion(false);
+        demoExam.setShuffleOption(true);
+        demoExam.setMaxAttempt(1);
+        demoExam.setStatus(ExamStatus.PUBLISHED);
+        demoExam.setCreatedBy(teacher);
+        examRepository.save(demoExam);
+
+        List<ExamQuestion> snapshots = new ArrayList<>();
+        for (int i = 0; i < pickedQuestions.size(); i++) {
+            Question q = pickedQuestions.get(i);
+            snapshots.add(ExamQuestion.snapshot(demoExam, q, q.getScore(), i + 1));
+        }
+        examQuestionRepository.saveAll(snapshots);
+
+        // 发布给 teacher 名下的两个班级
+        examClassRepository.save(ExamClass.of(demoExam.getId(), class1.getId()));
+        examClassRepository.save(ExamClass.of(demoExam.getId(), class2.getId()));
+
         log.info("""
                         
                         ==================== 种子数据初始化完成 ====================
@@ -222,13 +267,16 @@ public class DevDataSeeder implements ApplicationRunner {
                           student1 / {}  学生  李小明（软件工程 2301 班）
                           student2 / {}  学生  王小红（软件工程 2302 班）
                           student3 / {}  学生  赵小刚（未分班，用于验证分班流程）
-                        班级 {} 个，课程 {} 个，题目 {} 道，知识点 {} 个
+                        班级 {} 个，课程 {} 个，题目 {} 道，知识点 {} 个，考试 {} 场
+                          └ 示例考试「{}」已发布，{} 题 / {} 分，学生登录可见
                         ============================================================
                         """,
                 DEFAULT_PASSWORD, DEFAULT_PASSWORD, DEFAULT_PASSWORD,
                 DEFAULT_PASSWORD, DEFAULT_PASSWORD, DEFAULT_PASSWORD,
                 classRepository.count(), courseRepository.count(),
-                questionRepository.count(), knowledgePointRepository.count());
+                questionRepository.count(), knowledgePointRepository.count(),
+                examRepository.count(), demoExam.getTitle(),
+                pickedQuestions.size(), examTotal);
     }
 
     private String encode(String raw) {

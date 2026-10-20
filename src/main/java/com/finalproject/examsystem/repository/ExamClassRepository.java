@@ -11,4 +11,8 @@ public interface ExamClassRepository extends JpaRepository<ExamClass, ExamClassI
     List<ExamClass> findByExamId(Long examId);
 
     List<ExamClass> findByClassId(Long classId);
+
+    void deleteByExamId(Long examId);
+
+    void deleteByExamIdAndClassId(Long examId, Long classId);
 }

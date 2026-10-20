@@ -26,9 +26,19 @@
                         <el-icon><CollectionTag/></el-icon>
                         <span>知识点管理</span>
                     </el-menu-item>
+                    <el-menu-item index="/exams">
+                        <el-icon><Tickets/></el-icon>
+                        <span>考试管理</span>
+                    </el-menu-item>
                 </template>
 
-                <!-- 学生菜单：阶段 5 起补充"我的考试""我的成绩" -->
+                <!-- 学生菜单 -->
+                <template v-if="authStore.isStudent">
+                    <el-menu-item index="/my-exams">
+                        <el-icon><Tickets/></el-icon>
+                        <span>我的考试</span>
+                    </el-menu-item>
+                </template>
             </el-menu>
         </el-aside>
 
@@ -62,7 +72,7 @@
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { CollectionTag, Document, HomeFilled, MoreFilled, School, User } from '@element-plus/icons-vue'
+import { CollectionTag, Document, HomeFilled, MoreFilled, School, Tickets, User } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()

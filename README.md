@@ -2,8 +2,8 @@
 
 基于 Spring Boot 4 + Vue 3 的在线考试系统。面向大学软件工程综合实践，功能聚焦"客观题考试"闭环，不涉及 AI 判分等复杂技术。
 
-**当前进度：阶段 0（工程骨架）、阶段 1（认证与权限）、阶段 2（用户与班级管理）、阶段 3（题库与知识点管理）已完成并验证通过。**
-后端 59 个集成测试全绿，端到端检查 41 项全通过。
+**当前进度：阶段 0（工程骨架）、阶段 1（认证与权限）、阶段 2（用户与班级管理）、阶段 3（题库与知识点管理）、阶段 4（组卷与考试发布）已完成并验证通过。**
+后端 75 个集成测试全绿，端到端检查 41 项全通过。
 
 ---
 
@@ -115,6 +115,12 @@ node docs/scripts/e2e-phase2.mjs     # 阶段 2：用户与班级管理业务规
 知识点同课程重名拦截、被引用禁止删除、题型答案结构校验（单选唯一、多选≥2、判断 T/F、
 答案越界）、删除题目后释放知识点关联、按知识点筛选、学生越权 403。
 
+阶段 4 的组卷与发布由 `ExamApiTest`（16 个用例）覆盖，重点校验「发布前的五项把关」：
+试卷非空、**题目分值之和等于试卷总分**、已绑定班级、时间窗合法且未过期、及格线不超总分；
+以及「发布即冻结」——已发布考试不能改题目（50104）但可调整时间窗；
+教师数据隔离（跨教师查看/修改/绑班全部 403 或 50108）；
+学生只能看到本班考试、未分班学生列表为空。
+
 ---
 
 ## 已实现的功能模块
@@ -126,7 +132,8 @@ node docs/scripts/e2e-phase2.mjs     # 阶段 2：用户与班级管理业务规
 | 班级管理（教师） | ✅ | `GET/POST/PUT/DELETE /api/classes`、`GET /api/classes/options` |
 | 知识点管理（教师） | ✅ | `GET/POST/PUT/DELETE /api/knowledge-points`、`GET /api/knowledge-points/options` |
 | 题库管理（教师） | ✅ | `GET/POST/PUT/DELETE /api/questions`、`PUT /api/questions/{id}/enabled` |
-| 组卷与考试发布 | ⬜ 阶段 4 | — |
+| 组卷与考试发布（教师） | ✅ | `GET/POST/PUT/DELETE /api/exams`、`PUT /api/exams/{id}/questions`、`POST /api/exams/{id}/questions/random`、`PUT /api/exams/{id}/classes`、`PUT /api/exams/{id}/publish`、`PUT /api/exams/{id}/finish` |
+| 我的考试（学生） | ✅ | `GET /api/my/exams` |
 | 在线作答与判分 | ⬜ 阶段 5 | — |
 | 学情分析（知识点掌握度、难度贴合度） | ⬜ 阶段 6 | — |
 
@@ -202,17 +209,18 @@ exam-system/
 ├── src/main/java/com/finalproject/examsystem/
 │   ├── common/                  Result / PageResult / ErrorCode / 全局异常处理
 │   ├── config/                  SecurityConfig / JacksonConfig / DevDataSeeder
-│   ├── controller/              Auth / User / Student / Class / Question / KnowledgePoint / Course / Health
-│   ├── domain/                  12 张表的实体 + 枚举 + JSON 转换器
+│   ├── controller/              Auth / User / Student / Class / Question / KnowledgePoint / Course / Exam / StudentExam / Health
+│   ├── domain/                  12 张表的实体 + 枚举 + JSON 转换器（含 ExamPhase 时间阶段）
 │   ├── dto/                     请求/响应对象（与实体分离）
 │   │   ├── auth/                认证相关
 │   │   ├── user/                学生管理相关（查询、新增、修改、导入结果）
 │   │   ├── clazz/               班级管理相关
 │   │   ├── knowledge/           知识点相关（学情分析的主干）
-│   │   └── question/            题库相关（含知识点标签）
+│   │   ├── question/            题库相关（含知识点标签）
+│   │   └── exam/                组卷与考试发布相关
 │   ├── repository/              11 个 Spring Data JPA 接口（含教师数据范围查询）
 │   ├── security/                JWT 生成校验 / 过滤器 / 用户主体 / 401·403 处理器
-│   └── service/                 AuthService / UserService / ClassService / QuestionService / KnowledgePointService
+│   └── service/                 Auth / User / Class / Question / KnowledgePoint / Exam
 ├── src/main/resources/
 │   ├── application.yml          公共配置
 │   ├── application-dev.yml      MySQL（默认）+ 种子数据
@@ -224,16 +232,17 @@ exam-system/
 │   ├── StudentAdminApiTest.java 学生管理
 │   ├── ClassAdminApiTest.java   班级管理
 │   ├── DataScopeApiTest.java    教师数据隔离
-│   └── QuestionBankApiTest.java 知识点与题库规则
+│   ├── QuestionBankApiTest.java 知识点与题库规则
+│   └── ExamApiTest.java         组卷、发布校验与状态流转
 └── frontend/
-    ├── vite.config.js           代理 /api → 8080；build 输出到后端 static
+    ├── vite.config.js           代理 /api → 8080；build 输出到后端静态目录
     └── src/
-        ├── api/                 接口定义（auth / student / class / question）
+        ├── api/                 接口定义（auth / student / class / question / exam）
         ├── layouts/             AdminLayout（侧边菜单 + 顶栏）
         ├── router/              路由 + 登录/角色守卫
         ├── stores/              Pinia 登录态
         ├── utils/               Axios 封装（自动带 token、401 跳登录）
-        └── views/               登录页 / 工作台 / 学生管理 / 班级管理 / 404
+        └── views/               登录 / 工作台 / 学生 / 班级 / 题库 / 知识点 / 考试列表 / 考试编辑 / 我的考试
 ```
 
 ---
@@ -257,14 +266,17 @@ exam-system/
     （例如题目必须挂至少一个知识点、题型答案结构必须合法），否则脏数据会让后续统计结果不可信。
 12. **被引用数据不物理删除**：知识点被题目引用、学生有作答记录、班级内有学生时，
     一律拒绝删除并提示改为停用，避免历史统计出现"孤儿数据"。
+13. **组卷即快照、发布即冻结**：组卷时把题干/选项/答案/分值复制进 `exam_question`；
+    发布后题目与总分不再可变，只允许调整时间窗。这是保证历史成绩可追溯的核心约束。
+14. **状态机单一路径**：考试只能 `DRAFT → PUBLISHED → FINISHED`，
+    每个写操作都在 Service 内校验当前状态，非法流转一律 5xxxx 业务错误。
 
 ---
 
 ## 下一步
 
-详见 [docs/ROADMAP.md](docs/ROADMAP.md)。当前进度：**阶段 0、1、2、3 已完成**。
+详见 [docs/ROADMAP.md](docs/ROADMAP.md)。当前进度：**阶段 0、1、2、3、4 已完成**。
 
-- **阶段 4** 组卷与发布：手动/随机抽题、分值校验、绑定班级
 - **阶段 5** 在线作答与判分（核心）：预填答案、自动保存、断线恢复、服务端权威倒计时、客观题判分，
   **并上报每题作答耗时与修改次数**（阶段 6 交叉分析的输入）
 - **阶段 6** 学情分析与收尾：知识点掌握度聚合、薄弱知识点推送、题目难度 × 学生水平贴合度、

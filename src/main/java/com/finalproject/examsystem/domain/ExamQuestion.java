@@ -29,6 +29,16 @@ import java.util.List;
 @NoArgsConstructor
 public class ExamQuestion {
 
+    /**
+     * 所属考试，主键之一。
+     * <p>
+     * 必须参与主键：否则同一道题被两场考试引用时，(attemptNo, questionId) 会撞主键，
+     * 组卷直接失败。
+     */
+    @Id
+    @Column(name = "exam_id", nullable = false)
+    private Long examId;
+
     /** 作答轮次，默认 1（补考时为 2、3……） */
     @Id
     @Column(name = "attempt_no", nullable = false)
@@ -37,10 +47,6 @@ public class ExamQuestion {
     @Id
     @Column(name = "question_id", nullable = false)
     private Long questionId;
-
-    /** 归属考试。仅作关联，不参与主键，避免同一题在不同考试间冲突 */
-    @Column(name = "exam_id", nullable = false)
-    private Long examId;
 
     // ===== 以下均为组卷时的快照 =====
 
@@ -73,9 +79,9 @@ public class ExamQuestion {
     /** 从题库复制一份快照 */
     public static ExamQuestion snapshot(Exam exam, Question question, int score, int sortOrder) {
         ExamQuestion eq = new ExamQuestion();
+        eq.setExamId(exam.getId());
         eq.setAttemptNo(1);
         eq.setQuestionId(question.getId());
-        eq.setExamId(exam.getId());
         eq.setType(question.getType());
         eq.setStem(question.getStem());
         eq.setOptions(question.getOptions() == null ? List.of() : List.copyOf(question.getOptions()));

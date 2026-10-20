@@ -56,6 +56,14 @@ public enum ErrorCode {
     EXAM_SCORE_MISMATCH(50101, "题目分值之和与试卷总分不一致", HttpStatus.BAD_REQUEST),
     EXAM_NOT_STARTED(50102, "考试尚未开始", HttpStatus.BAD_REQUEST),
     EXAM_ENDED(50103, "考试已结束", HttpStatus.BAD_REQUEST),
+    EXAM_STATUS_INVALID(50104, "当前考试状态下不允许该操作", HttpStatus.CONFLICT),
+    EXAM_NO_QUESTIONS(50105, "试卷还没有题目，无法发布", HttpStatus.BAD_REQUEST),
+    EXAM_NO_CLASS(50106, "请至少选择一个参考班级", HttpStatus.BAD_REQUEST),
+    EXAM_TIME_INVALID(50107, "考试时间设置不合法", HttpStatus.BAD_REQUEST),
+    EXAM_NOT_OWNED(50108, "该考试不属于当前教师，无权操作", HttpStatus.FORBIDDEN),
+    EXAM_HAS_RECORDS(50109, "该考试已有作答记录，无法删除或修改题目", HttpStatus.CONFLICT),
+    EXAM_QUESTION_DUPLICATED(50110, "同一道题在试卷中重复出现", HttpStatus.BAD_REQUEST),
+    EXAM_QUESTION_NOT_ENOUGH(50111, "题库中符合条件的题目数量不足", HttpStatus.BAD_REQUEST),
 
     // ===== 6xxxx 作答 =====
     RECORD_NOT_FOUND(60100, "答题记录不存在", HttpStatus.NOT_FOUND),
