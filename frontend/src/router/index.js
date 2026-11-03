@@ -63,6 +63,13 @@ const routes = [
                 meta: { title: '编辑考试', roles: ['TEACHER'] }
             },
             {
+                // 学情分析看板：从考试列表进入
+                path: 'analytics/:examId',
+                name: 'exam-analytics',
+                component: () => import('@/views/ExamAnalyticsView.vue'),
+                meta: { title: '学情分析', roles: ['TEACHER'] }
+            },
+            {
                 path: 'my-exams',
                 name: 'my-exams',
                 component: () => import('@/views/MyExamsView.vue'),

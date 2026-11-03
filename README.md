@@ -2,8 +2,8 @@
 
 基于 Spring Boot 4 + Vue 3 的在线考试系统。面向大学软件工程综合实践，功能聚焦"客观题考试"闭环，不涉及 AI 判分等复杂技术。
 
-**当前进度：阶段 0~5 已完成并验证通过**（工程骨架、认证权限、用户班级、题库知识点、组卷发布、在线作答与判分）。
-后端 102 个测试全绿，端到端检查 41 项全通过。
+**当前进度：阶段 0~6 全部完成**（工程骨架、认证权限、用户班级、题库知识点、组卷发布、在线作答与判分、学情分析）。
+后端 114 个测试全绿，端到端检查 41 项全通过。
 
 ---
 
@@ -136,7 +136,8 @@ node docs/scripts/e2e-phase2.mjs     # 阶段 2：用户与班级管理业务规
 | 我的考试（学生） | ✅ | `GET /api/my/exams` |
 | 在线作答与判分（学生） | ✅ | `POST /api/my/exams/{id}/start`、`GET /api/my/exams/{id}/paper`、`PUT /api/my/records/{id}/answers`、`POST /api/my/records/{id}/submit`、`GET /api/my/records/{id}/result`、`POST /api/my/records/{id}/switch-screen` |
 | 我的成绩（学生） | ✅ | `GET /api/my/records` |
-| 学情分析（知识点掌握度、难度贴合度） | ⬜ 阶段 6 | — |
+| 学情分析（教师） | ✅ | `GET /api/analytics/exams/{examId}` |
+| 学情分析（学生） | ✅ | `GET /api/my/records/{id}/analysis`、`GET /api/my/records/{id}/detail` |
 
 > **知识点与学情分析的关系**：系统的学情分析口径是「按知识点聚合作答正确率」。
 > 因此知识点必须在录题时就标注（一道题可挂多个），否则该题的作答不会计入任何统计。
@@ -210,7 +211,8 @@ exam-system/
 ├── src/main/java/com/finalproject/examsystem/
 │   ├── common/                  Result / PageResult / ErrorCode / 全局异常处理
 │   ├── config/                  SecurityConfig / JacksonConfig / DevDataSeeder
-│   ├── controller/              Auth / User / Student / Class / Question / KnowledgePoint / Course / Exam / StudentExam / StudentAnswer / Health
+│   ├── controller/              Auth / User / Student / Class / Question / KnowledgePoint / Course /
+│   │                            Exam / StudentExam / StudentAnswer / Analytics / Health
 │   ├── domain/                  12 张表的实体 + 枚举 + JSON 转换器（含 ExamPhase 时间阶段）
 │   ├── dto/                     请求/响应对象（与实体分离）
 │   │   ├── auth/                认证相关
@@ -219,11 +221,13 @@ exam-system/
 │   │   ├── knowledge/           知识点相关（学情分析的主干）
 │   │   ├── question/            题库相关（含知识点标签）
 │   │   ├── exam/                组卷与考试发布相关
-│   │   └── answer/              作答与判分相关（题面 DTO 不含答案）
+│   │   ├── answer/              作答与判分相关（题面 DTO 不含答案）
+│   │   └── analytics/           学情分析相关（掌握度、难度贴合、作答详情）
 │   ├── repository/              11 个 Spring Data JPA 接口（含教师数据范围查询）
 │   ├── security/                JWT 生成校验 / 过滤器 / 用户主体 / 401·403 处理器
 │   └── service/                 Auth / User / Class / Question / KnowledgePoint / Exam /
-│                                 ExamTaking（作答与判分）/ ObjectiveGrader（判分纯函数）
+│                                 ExamTaking（作答与判分）/ ObjectiveGrader（判分纯函数）/
+│                                 Analytics（学情分析）
 ├── src/main/resources/
 │   ├── application.yml          公共配置
 │   ├── application-dev.yml      MySQL（默认）+ 种子数据
@@ -237,19 +241,21 @@ exam-system/
 │   ├── DataScopeApiTest.java    教师数据隔离
 │   ├── QuestionBankApiTest.java 知识点与题库规则
 │   ├── ExamApiTest.java         组卷、发布校验与状态流转
-│   └── ExamTakingApiTest.java   作答、自动保存、判分与幂等
+│   ├── ExamTakingApiTest.java   作答、自动保存、判分与幂等
+│   └── AnalyticsApiTest.java    学情分析：掌握度、样本门槛、数据归属
 ├── src/test/java/.../service/
 │   └── ObjectiveGraderTest.java 判分规则单元测试（纯函数）
 └── frontend/
     ├── vite.config.js           代理 /api → 8080；build 输出到后端静态目录
     └── src/
-        ├── api/                 接口定义（auth / student / class / question / exam / answer）
+        ├── api/                 接口定义（auth / student / class / question / exam / answer / analytics）
         ├── layouts/             AdminLayout（侧边菜单 + 顶栏）
         ├── router/              路由 + 登录/角色守卫
         ├── stores/              Pinia 登录态
         ├── utils/               Axios 封装（自动带 token、401 跳登录）
         └── views/               登录 / 工作台 / 学生 / 班级 / 题库 / 知识点 /
-                                 考试列表 / 考试编辑 / 我的考试 / 在线作答 / 考试结果 / 我的成绩
+                                 考试列表 / 考试编辑 / 学情分析 /
+                                 我的考试 / 在线作答 / 考试结果 / 我的成绩
 ```
 
 ---
@@ -283,16 +289,50 @@ exam-system/
     判分逻辑抽成无框架依赖的 `ObjectiveGrader` 纯函数，便于逐条单测。
 17. **权威计时在服务端**：截止时间由服务端按「开始作答 + 时长」与「考试结束时间」取较早者计算，
     每次保存与交卷都重新校验；前端倒计时仅用于显示。
+18. **统计口径必须写清楚**：掌握度按**分值加权**（Σ答对题分值 / Σ该知识点全部题分值），
+    不按题数平均；所有判断类结论在样本不足时标注「仅供参考」，不硬给结论。
+19. **判断题给依据**：每个"偏难/偏易"都同时给出得分率与平均耗时，
+    便于教师复核——只有一个标签而没有数据的判断，教师无法验证，也无法据此行动。
+
+---
+
+## 学情分析的设计取舍
+
+本项目刻意**没有**做心理测量学意义上的「区分度」：
+
+- 区分度需要足够大的样本（通常 ≥ 30 人且分数呈正态分布）才有意义，
+  而课程项目的演示数据量远远不够，算出来的数字不可信。
+- 取而代之的是**「题目难度 × 班级水平贴合度」**：把某题得分率与班级平均得分率比较，
+  偏离超过 25% 就提示复核。判据简单、可解释、教师能直接验证。
+- 并且**与作答耗时交叉判断**：得分率低且耗时很短 → 学生可能直接放弃或题干表述不清；
+  得分率低但耗时长 → 属真实难点，不必改题。单看耗时没有意义，必须交叉。
+
+样本门槛已实现：已交卷人数 < 30 时，看板顶部提示样本不足，每题判断标注「样本不足，仅供参考」。
+
+---
+
+## 演示数据
+
+```bash
+# 生成学情分析用的演示作答（student1 答对 70%、student2 答对 40%）
+node docs/scripts/seed-demo-attempts.mjs
+```
+
+脚本通过接口造数据，可重复执行（已有作答的学生会跳过）。生成后到
+「考试管理 → 学情分析」即可看到分数段分布、知识点掌握度差异与题目难度判断。
+
+> 这是**演示数据**，仅用于展示看板效果，不代表真实学情。
 
 ---
 
 ## 下一步
 
-详见 [docs/ROADMAP.md](docs/ROADMAP.md)。当前进度：**阶段 0、1、2、3、4、5 已完成**。
+详见 [docs/ROADMAP.md](docs/ROADMAP.md)。当前进度：**阶段 0~6 全部完成**。
 
-- **阶段 6** 学情分析与收尾：知识点掌握度聚合、薄弱知识点推送、题目难度 × 学生水平贴合度、
-  样本量门槛、成绩单与图表、答辩材料
+可选的后续扩展（不影响交付）：
 
-> 不阻塞后续开发的小尾巴：「学生自己修改密码」的前端页面尚未做（后端接口 `PUT /api/auth/password` 已完成）；
-> 逐题作答详情（含正确答案与解析）尚未做前端页面，可与阶段 6 一起补；
-> 题库 Excel 批量导入与图片题干上传留作可选扩展。
+- 「学生自己修改密码」的前端页面（后端 `PUT /api/auth/password` 已完成）
+- 题库 Excel 批量导入、图片题干上传
+- 成绩单导出 Excel（当前成绩数据已全部可通过接口获取）
+- 多轮考试（`exam_question.attempt_no` 与 `exam_record.attempt_no` 已预留，`max_attempt` 已可配置，
+  目前作答逻辑固定为第 1 轮）

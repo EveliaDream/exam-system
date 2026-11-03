@@ -1,9 +1,12 @@
 package com.finalproject.examsystem.controller;
 
 import com.finalproject.examsystem.common.Result;
+import com.finalproject.examsystem.dto.analytics.MyKnowledgeAnalysisResponse;
+import com.finalproject.examsystem.dto.analytics.RecordDetailResponse;
 import com.finalproject.examsystem.dto.answer.MyRecordResponse;
 import com.finalproject.examsystem.dto.answer.SaveAnswersRequest;
 import com.finalproject.examsystem.dto.answer.SubmitResultResponse;
+import com.finalproject.examsystem.service.AnalyticsService;
 import com.finalproject.examsystem.service.ExamTakingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +34,7 @@ import java.util.List;
 public class StudentAnswerController {
 
     private final ExamTakingService examTakingService;
+    private final AnalyticsService analyticsService;
 
     /** 我的成绩列表（已交卷的记录） */
     @GetMapping
@@ -59,6 +63,27 @@ public class StudentAnswerController {
     @GetMapping("/{recordId}/result")
     public Result<SubmitResultResponse> result(@PathVariable Long recordId) {
         return Result.ok(examTakingService.result(recordId));
+    }
+
+    /**
+     * 逐题作答详情（含正确答案与解析）。
+     * <p>
+     * 只在交卷后开放——作答中访问会被拒绝，避免提前看到答案。
+     */
+    @GetMapping("/{recordId}/detail")
+    public Result<RecordDetailResponse> detail(@PathVariable Long recordId) {
+        return Result.ok(analyticsService.recordDetail(recordId));
+    }
+
+    /**
+     * 我的学情分析：知识点掌握度与薄弱知识点推送。
+     * <p>
+     * 掌握度按分值加权（Σ答对题分值 / Σ该知识点全部题分值），
+     * 推送掌握度低于 60% 的前 5 个知识点；若都达标则返回空列表，不硬凑。
+     */
+    @GetMapping("/{recordId}/analysis")
+    public Result<MyKnowledgeAnalysisResponse> analysis(@PathVariable Long recordId) {
+        return Result.ok(analyticsService.myAnalysis(recordId));
     }
 
     /** 切屏次数上报（只留痕，不判作弊） */

@@ -23,10 +23,16 @@ public interface ExamRecordRepository extends JpaRepository<ExamRecord, Long> {
 
     List<ExamRecord> findByStudentIdOrderByIdDesc(Long studentId);
 
+    /** 某场考试的全部记录（用于学情分析） */
+    List<ExamRecord> findByExamIdAndStatusIn(Long examId, List<RecordStatus> statuses);
+
     /** 学生已交卷的记录（用于「我的成绩」） */
     List<ExamRecord> findByStudentIdAndStatusInOrderByIdDesc(Long studentId, List<RecordStatus> statuses);
 
     long countByExamIdAndStatus(Long examId, RecordStatus status);
+
+    /** 按状态集合计数：用于区分「已交卷」与「已开始未交卷」 */
+    long countByExamIdAndStatusIn(Long examId, List<RecordStatus> statuses);
 
     long countByExamIdAndStudentIdAndStatusIn(Long examId, Long studentId, List<RecordStatus> statuses);
 

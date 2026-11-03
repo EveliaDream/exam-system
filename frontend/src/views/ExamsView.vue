@@ -60,9 +60,11 @@
                 <el-table-column label="时长" width="80" align="center">
                     <template #default="{ row }">{{ row.duration }} 分</template>
                 </el-table-column>
-                <el-table-column label="操作" width="260" align="center" fixed="right">
+                <el-table-column label="操作" width="300" align="center" fixed="right">
                     <template #default="{ row }">
                         <el-button link type="primary" size="small" @click="goEdit(row)">编辑</el-button>
+                        <el-button v-if="row.status !== 'DRAFT'" link type="success" size="small"
+                                   @click="$router.push(`/analytics/${row.id}`)">学情分析</el-button>
                         <el-button v-if="row.status === 'DRAFT'" link type="success" size="small"
                                    @click="onPublish(row)">发布</el-button>
                         <el-button v-if="row.status === 'PUBLISHED'" link type="warning" size="small"

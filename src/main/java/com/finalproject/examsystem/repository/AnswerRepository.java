@@ -10,6 +10,9 @@ public interface AnswerRepository extends JpaRepository<Answer, Long> {
 
     List<Answer> findByRecordId(Long recordId);
 
+    /** 批量取多份作答的明细：学情分析按考试聚合时避免逐份查询（N+1） */
+    List<Answer> findByRecordIdIn(List<Long> recordIds);
+
     Optional<Answer> findByRecordIdAndQuestionId(Long recordId, Long questionId);
 
     long countByRecordId(Long recordId);
