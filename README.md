@@ -2,8 +2,8 @@
 
 基于 Spring Boot 4 + Vue 3 的在线考试系统。面向大学软件工程综合实践，功能聚焦"客观题考试"闭环，不涉及 AI 判分等复杂技术。
 
-**当前进度：阶段 0（工程骨架）、阶段 1（认证与权限）、阶段 2（用户与班级管理）、阶段 3（题库与知识点管理）、阶段 4（组卷与考试发布）已完成并验证通过。**
-后端 75 个集成测试全绿，端到端检查 41 项全通过。
+**当前进度：阶段 0~5 已完成并验证通过**（工程骨架、认证权限、用户班级、题库知识点、组卷发布、在线作答与判分）。
+后端 102 个测试全绿，端到端检查 41 项全通过。
 
 ---
 
@@ -134,7 +134,8 @@ node docs/scripts/e2e-phase2.mjs     # 阶段 2：用户与班级管理业务规
 | 题库管理（教师） | ✅ | `GET/POST/PUT/DELETE /api/questions`、`PUT /api/questions/{id}/enabled` |
 | 组卷与考试发布（教师） | ✅ | `GET/POST/PUT/DELETE /api/exams`、`PUT /api/exams/{id}/questions`、`POST /api/exams/{id}/questions/random`、`PUT /api/exams/{id}/classes`、`PUT /api/exams/{id}/publish`、`PUT /api/exams/{id}/finish` |
 | 我的考试（学生） | ✅ | `GET /api/my/exams` |
-| 在线作答与判分 | ⬜ 阶段 5 | — |
+| 在线作答与判分（学生） | ✅ | `POST /api/my/exams/{id}/start`、`GET /api/my/exams/{id}/paper`、`PUT /api/my/records/{id}/answers`、`POST /api/my/records/{id}/submit`、`GET /api/my/records/{id}/result`、`POST /api/my/records/{id}/switch-screen` |
+| 我的成绩（学生） | ✅ | `GET /api/my/records` |
 | 学情分析（知识点掌握度、难度贴合度） | ⬜ 阶段 6 | — |
 
 > **知识点与学情分析的关系**：系统的学情分析口径是「按知识点聚合作答正确率」。
@@ -209,7 +210,7 @@ exam-system/
 ├── src/main/java/com/finalproject/examsystem/
 │   ├── common/                  Result / PageResult / ErrorCode / 全局异常处理
 │   ├── config/                  SecurityConfig / JacksonConfig / DevDataSeeder
-│   ├── controller/              Auth / User / Student / Class / Question / KnowledgePoint / Course / Exam / StudentExam / Health
+│   ├── controller/              Auth / User / Student / Class / Question / KnowledgePoint / Course / Exam / StudentExam / StudentAnswer / Health
 │   ├── domain/                  12 张表的实体 + 枚举 + JSON 转换器（含 ExamPhase 时间阶段）
 │   ├── dto/                     请求/响应对象（与实体分离）
 │   │   ├── auth/                认证相关
@@ -217,10 +218,12 @@ exam-system/
 │   │   ├── clazz/               班级管理相关
 │   │   ├── knowledge/           知识点相关（学情分析的主干）
 │   │   ├── question/            题库相关（含知识点标签）
-│   │   └── exam/                组卷与考试发布相关
+│   │   ├── exam/                组卷与考试发布相关
+│   │   └── answer/              作答与判分相关（题面 DTO 不含答案）
 │   ├── repository/              11 个 Spring Data JPA 接口（含教师数据范围查询）
 │   ├── security/                JWT 生成校验 / 过滤器 / 用户主体 / 401·403 处理器
-│   └── service/                 Auth / User / Class / Question / KnowledgePoint / Exam
+│   └── service/                 Auth / User / Class / Question / KnowledgePoint / Exam /
+│                                 ExamTaking（作答与判分）/ ObjectiveGrader（判分纯函数）
 ├── src/main/resources/
 │   ├── application.yml          公共配置
 │   ├── application-dev.yml      MySQL（默认）+ 种子数据
@@ -233,16 +236,20 @@ exam-system/
 │   ├── ClassAdminApiTest.java   班级管理
 │   ├── DataScopeApiTest.java    教师数据隔离
 │   ├── QuestionBankApiTest.java 知识点与题库规则
-│   └── ExamApiTest.java         组卷、发布校验与状态流转
+│   ├── ExamApiTest.java         组卷、发布校验与状态流转
+│   └── ExamTakingApiTest.java   作答、自动保存、判分与幂等
+├── src/test/java/.../service/
+│   └── ObjectiveGraderTest.java 判分规则单元测试（纯函数）
 └── frontend/
     ├── vite.config.js           代理 /api → 8080；build 输出到后端静态目录
     └── src/
-        ├── api/                 接口定义（auth / student / class / question / exam）
+        ├── api/                 接口定义（auth / student / class / question / exam / answer）
         ├── layouts/             AdminLayout（侧边菜单 + 顶栏）
         ├── router/              路由 + 登录/角色守卫
         ├── stores/              Pinia 登录态
         ├── utils/               Axios 封装（自动带 token、401 跳登录）
-        └── views/               登录 / 工作台 / 学生 / 班级 / 题库 / 知识点 / 考试列表 / 考试编辑 / 我的考试
+        └── views/               登录 / 工作台 / 学生 / 班级 / 题库 / 知识点 /
+                                 考试列表 / 考试编辑 / 我的考试 / 在线作答 / 考试结果 / 我的成绩
 ```
 
 ---
@@ -270,17 +277,22 @@ exam-system/
     发布后题目与总分不再可变，只允许调整时间窗。这是保证历史成绩可追溯的核心约束。
 14. **状态机单一路径**：考试只能 `DRAFT → PUBLISHED → FINISHED`，
     每个写操作都在 Service 内校验当前状态，非法流转一律 5xxxx 业务错误。
+15. **学生端 DTO 永不带答案**：作答题目用独立的 `PaperQuestionResponse`，
+    不含 `answer` / `analysis`。若直接返回实体，学生打开 F12 就能看到正确答案。
+16. **判分只读快照**：判分从 `exam_question` 取标准答案，绝不回查题库；
+    判分逻辑抽成无框架依赖的 `ObjectiveGrader` 纯函数，便于逐条单测。
+17. **权威计时在服务端**：截止时间由服务端按「开始作答 + 时长」与「考试结束时间」取较早者计算，
+    每次保存与交卷都重新校验；前端倒计时仅用于显示。
 
 ---
 
 ## 下一步
 
-详见 [docs/ROADMAP.md](docs/ROADMAP.md)。当前进度：**阶段 0、1、2、3、4 已完成**。
+详见 [docs/ROADMAP.md](docs/ROADMAP.md)。当前进度：**阶段 0、1、2、3、4、5 已完成**。
 
-- **阶段 5** 在线作答与判分（核心）：预填答案、自动保存、断线恢复、服务端权威倒计时、客观题判分，
-  **并上报每题作答耗时与修改次数**（阶段 6 交叉分析的输入）
 - **阶段 6** 学情分析与收尾：知识点掌握度聚合、薄弱知识点推送、题目难度 × 学生水平贴合度、
   样本量门槛、成绩单与图表、答辩材料
 
 > 不阻塞后续开发的小尾巴：「学生自己修改密码」的前端页面尚未做（后端接口 `PUT /api/auth/password` 已完成）；
+> 逐题作答详情（含正确答案与解析）尚未做前端页面，可与阶段 6 一起补；
 > 题库 Excel 批量导入与图片题干上传留作可选扩展。

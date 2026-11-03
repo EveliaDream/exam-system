@@ -67,8 +67,26 @@ const routes = [
                 name: 'my-exams',
                 component: () => import('@/views/MyExamsView.vue'),
                 meta: { title: '我的考试', roles: ['STUDENT'] }
+            },
+            {
+                // 答题页：不带菜单高亮，避免作答时误点别的菜单
+                path: 'my-exams/:examId/take',
+                name: 'exam-taking',
+                component: () => import('@/views/ExamTakingView.vue'),
+                meta: { title: '在线作答', roles: ['STUDENT'] }
+            },
+            {
+                path: 'my-records/:recordId',
+                name: 'exam-result',
+                component: () => import('@/views/ExamResultView.vue'),
+                meta: { title: '考试结果', roles: ['STUDENT'] }
+            },
+            {
+                path: 'my-scores',
+                name: 'my-scores',
+                component: () => import('@/views/MyScoresView.vue'),
+                meta: { title: '我的成绩', roles: ['STUDENT'] }
             }
-            // 阶段 5 起补充（学生）：在线作答、我的成绩
         ]
     },
     {

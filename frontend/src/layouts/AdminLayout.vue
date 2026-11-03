@@ -38,6 +38,10 @@
                         <el-icon><Tickets/></el-icon>
                         <span>我的考试</span>
                     </el-menu-item>
+                    <el-menu-item index="/my-scores">
+                        <el-icon><TrendCharts/></el-icon>
+                        <span>我的成绩</span>
+                    </el-menu-item>
                 </template>
             </el-menu>
         </el-aside>
@@ -72,7 +76,7 @@
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { CollectionTag, Document, HomeFilled, MoreFilled, School, Tickets, User } from '@element-plus/icons-vue'
+import { CollectionTag, Document, HomeFilled, MoreFilled, School, Tickets, TrendCharts, User } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()

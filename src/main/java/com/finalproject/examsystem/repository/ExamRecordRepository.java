@@ -13,11 +13,22 @@ public interface ExamRecordRepository extends JpaRepository<ExamRecord, Long> {
 
     Optional<ExamRecord> findByExamIdAndStudentIdAndAttemptNo(Long examId, Long studentId, Integer attemptNo);
 
+    /** 取该学生在这场考试中最新一轮的记录：用于「继续作答」与限考次数判断 */
+    Optional<ExamRecord> findTopByExamIdAndStudentIdOrderByAttemptNoDesc(Long examId, Long studentId);
+
+    /** 按 id 与学员双重定位：防止学生改 recordId 访问别人的作答记录 */
+    Optional<ExamRecord> findByIdAndStudentId(Long id, Long studentId);
+
     List<ExamRecord> findByExamIdOrderByObjectiveScoreDesc(Long examId);
 
     List<ExamRecord> findByStudentIdOrderByIdDesc(Long studentId);
 
+    /** 学生已交卷的记录（用于「我的成绩」） */
+    List<ExamRecord> findByStudentIdAndStatusInOrderByIdDesc(Long studentId, List<RecordStatus> statuses);
+
     long countByExamIdAndStatus(Long examId, RecordStatus status);
+
+    long countByExamIdAndStudentIdAndStatusIn(Long examId, Long studentId, List<RecordStatus> statuses);
 
     /**
      * 判断学生是否已有作答记录。

@@ -55,8 +55,16 @@ public class Answer {
     @Column(name = "score")
     private Integer score;
 
-    @Column(name = "is_correct")
-    private Boolean correct;
+    /**
+     * 判分后回填；预填阶段为 false。
+     * <p>
+     * 必须给默认值并声明 nullable=false：MySQL 建表脚本里该列是 NOT NULL，
+     * 若实体字段为 null，Hibernate 会显式插入 NULL 而覆盖列默认值，直接报
+     * 「Column 'is_correct' cannot be null」。
+     * （H2 由实体自动建表时更宽松，测试环境不会暴露这个差异。）
+     */
+    @Column(name = "is_correct", nullable = false)
+    private Boolean correct = false;
 
     @Column(name = "answered_at")
     private LocalDateTime answeredAt = LocalDateTime.now();

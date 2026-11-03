@@ -433,3 +433,64 @@ PRIMARY KEY (exam_id, attempt_no, question_id)
    （方法不支持先于鉴权触发）。写越权测试必须命中**真实的方法 + 路径**。
 3. **参数校验先于业务校验**：抽题数量写 999 时先被 `@Max(100)` 拦成 20001，
    根本走不到"题库数量不足"的 50111。测业务规则要把参数放在合法范围内。
+
+---
+
+## 十一、阶段 5 的坑：H2 自动建表比 MySQL 脚本宽松，掩盖了 NOT NULL 缺失
+
+### 现象
+
+阶段 5 的 102 个测试全绿，但用真实 MySQL 启动后点「进入考试」直接 500：
+
+```
+Column 'is_correct' cannot be null
+insert into answer (answered_at, is_correct, first_answered_at, question_id, ...) values (?, ?, ...)
+```
+
+### 原因
+
+`Answer` 实体里的字段是：
+
+```java
+@Column(name = "is_correct")
+private Boolean correct;      // 没有默认值
+```
+
+预填答题行时调用 `Answer.empty()`，没有设置 `correct`，所以是 `null`。
+Handwritten 的 `schema.sql` 里这一列是 `is_correct BIT(1) NOT NULL DEFAULT 0`。
+
+**关键点**：MySQL 在 INSERT 显式写入 `NULL` 时会直接拒绝（DEFAULT 只在"未提供该列"时生效），
+所以报错。而测试跑在 H2 上，`ddl-auto=create-drop` 是由**实体**反推建表的，
+实体没写 `nullable = false`，生成的列就可空 —— 于是测试永远发现不了。
+
+### 为什么这类问题难防
+
+- 测试用的是"从实体生成 schema"，生产用的是"手写 schema 脚本"，**两条来源本身就可能不一致**。
+- 不一致平时不会报错，只在"某条写入路径没给字段赋值"时才炸，而且炸在运行时。
+- 这个 bug 只有在真实 MySQL 上点一次「进入考试」才会出现，正好说明**为什么要在真库上冒烟一次**。
+
+### 修复
+
+```java
+@Column(name = "is_correct", nullable = false)
+private Boolean correct = false;
+```
+
+### 得到的规则
+
+1. **实体上的 `nullable = false` 必须与建表脚本一致**，两边都写，不要只写一边。
+2. 布尔、计数器这类"业务上永远有值"的字段，**给 Java 默认值**，不要依赖数据库 DEFAULT。
+3. 集成测试通过不等于部署可用：涉及 DDL 的部分，**至少在真实数据库上手工跑一次主链路**。
+
+同类可以自查的字段（本次一并确认过都已有默认值）：
+`User.enabled`、`Question.enabled`、`Exam.shuffleQuestion/shuffleOption`、
+`ExamRecord.switchScreenCount`、`Answer.submitCount`、`KnowledgePoint.enabled`。
+
+### 另外两个阶段 5 的测试发现
+
+- **已交卷记录仍返回 1799 秒剩余时间**：`startAfterSubmitReturnsFinishedShell` 断言剩余为 0 时失败，
+  暴露出 `buildPaper()` 对已结束记录仍计算倒计时。前端会显示"还有 30 分钟"，学生容易误判。
+  修复：`record.finished()` 时剩余时间强制为 0。
+- **Vite 被临时文件搞崩**：编辑器的原子写入会在 `src` 下生成 `.*.tmpdir` 目录，
+  Vite 的文件监听抓到后抛 `EBUSY` 直接退出。已在 `vite.config.js` 中加
+  `server.watch.ignored: ['**/.*.tmpdir/**', '**/*.tmp']`。

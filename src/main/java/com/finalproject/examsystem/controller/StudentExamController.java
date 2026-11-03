@@ -1,11 +1,15 @@
 package com.finalproject.examsystem.controller;
 
 import com.finalproject.examsystem.common.Result;
+import com.finalproject.examsystem.dto.answer.ExamPaperResponse;
 import com.finalproject.examsystem.dto.exam.StudentExamResponse;
 import com.finalproject.examsystem.service.ExamService;
+import com.finalproject.examsystem.service.ExamTakingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -24,6 +28,7 @@ import java.util.List;
 public class StudentExamController {
 
     private final ExamService examService;
+    private final ExamTakingService examTakingService;
 
     /**
      * 我的考试列表。
@@ -34,5 +39,22 @@ public class StudentExamController {
     @GetMapping
     public Result<List<StudentExamResponse>> myExams() {
         return Result.ok(examService.myExams());
+    }
+
+    /**
+     * 开始考试。
+     * <p>
+     * 幂等：重复调用返回同一份试卷与已保存答案（断线重进走这里）。
+     * 若已交卷或已超时，返回 status 为已结束的空试卷，前端据此跳转成绩页。
+     */
+    @PostMapping("/{examId}/start")
+    public Result<ExamPaperResponse> start(@PathVariable Long examId) {
+        return Result.ok(examTakingService.start(examId));
+    }
+
+    /** 刷新页面后恢复试卷（与 start 等价，只读语义更清晰） */
+    @GetMapping("/{examId}/paper")
+    public Result<ExamPaperResponse> paper(@PathVariable Long examId) {
+        return Result.ok(examTakingService.paper(examId));
     }
 }

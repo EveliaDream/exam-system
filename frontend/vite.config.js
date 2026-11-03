@@ -19,6 +19,11 @@ export default defineConfig({
                 target: 'http://localhost:8080',
                 changeOrigin: true
             }
+        },
+        watch: {
+            // 编辑器的原子写入会在 src 下临时生成 .xxx.tmpdir 目录，
+            // 被文件监听器抓到后会抛 EBUSY 直接把 dev server 弄崩，这里统一忽略。
+            ignored: ['**/.*.tmpdir/**', '**/*.tmp']
         }
     },
     build: {

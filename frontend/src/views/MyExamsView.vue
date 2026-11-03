@@ -35,12 +35,12 @@
                         <div class="sub">至 {{ row.endTime }}</div>
                     </template>
                 </el-table-column>
-                <el-table-column label="操作" width="120" align="center">
+                <el-table-column label="操作" width="140" align="center">
                     <template #default="{ row }">
-                        <el-button v-if="row.canEnter" type="primary" size="small" disabled>
-                            进入考试（下一阶段）
+                        <el-button v-if="row.canEnter" type="primary" size="small" @click="enterExam(row)">
+                            进入考试
                         </el-button>
-                        <span v-else class="sub">不可进入</span>
+                        <span v-else class="sub">{{ row.phase === 'NOT_STARTED' ? '未开始' : '已结束' }}</span>
                     </template>
                 </el-table-column>
                 <template #empty>
@@ -53,13 +53,19 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { myExamApi } from '@/api/exam'
 
+const router = useRouter()
 const loading = ref(false)
 const rows = ref([])
 
 function phaseType(p) {
     return { ONGOING: 'success', NOT_STARTED: 'info', ENDED: 'warning' }[p] || ''
+}
+
+function enterExam(row) {
+    router.push(`/my-exams/${row.id}/take`)
 }
 
 async function load() {
