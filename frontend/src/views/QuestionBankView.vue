@@ -50,7 +50,10 @@
             <template #header>
                 <div class="card-header">
                     <span>题库（共 {{ total }} 道）</span>
-                    <el-button type="primary" :icon="Plus" @click="openCreate">新增题目</el-button>
+                    <div>
+                        <el-button :icon="Upload" @click="importVisible = true">Excel 导入</el-button>
+                        <el-button type="primary" :icon="Plus" @click="openCreate">新增题目</el-button>
+                    </div>
                 </div>
             </template>
 
@@ -215,14 +218,71 @@
                 <el-button type="primary" :loading="saving" @click="onSubmit">保存</el-button>
             </template>
         </el-dialog>
+
+        <!-- Excel 批量导入 -->
+        <el-dialog v-model="importVisible" title="题库批量导入" width="620px" :close-on-click-modal="false"
+                   @closed="resetImport">
+            <el-alert type="info" :closable="false" show-icon class="mb-12"
+                      title="逐行导入，某一行出错不影响其他行">
+                先下载模板按格式填写；知识点与课程列必须与系统中已有名称完全一致，
+                否则该行会被跳过并提示原因。单次最多 500 行。
+            </el-alert>
+
+            <div class="import-actions">
+                <el-button :icon="Download" @click="onDownloadTemplate">下载模板</el-button>
+                <span class="hint">建议先下载模板，示例行可直接覆盖</span>
+            </div>
+
+            <el-upload
+                drag
+                :auto-upload="false"
+                :limit="1"
+                accept=".xlsx"
+                :on-change="onFileChange"
+                :on-remove="() => (importFile = null)"
+                :file-list="fileList"
+                class="mb-12"
+            >
+                <el-icon class="el-icon--upload"><UploadFilled/></el-icon>
+                <div class="el-upload__text">把 .xlsx 文件拖到这里，或<em>点击选择</em></div>
+                <template #tip>
+                    <div class="hint">仅支持 .xlsx（.xls 请先在 Excel 中另存为 .xlsx）</div>
+                </template>
+            </el-upload>
+
+            <template v-if="importResult">
+                <el-divider/>
+                <el-descriptions :column="3" border size="small">
+                    <el-descriptions-item label="总行数">{{ importResult.total }}</el-descriptions-item>
+                    <el-descriptions-item label="成功">
+                        <span class="ok">{{ importResult.success }}</span>
+                    </el-descriptions-item>
+                    <el-descriptions-item label="失败">
+                        <span :class="importResult.failed ? 'bad' : ''">{{ importResult.failed }}</span>
+                    </el-descriptions-item>
+                </el-descriptions>
+                <div v-if="importResult.errors?.length" class="error-box">
+                    <div class="error-title">失败明细</div>
+                    <div v-for="(e, i) in importResult.errors" :key="i" class="error-line">{{ e }}</div>
+                </div>
+            </template>
+
+            <template #footer>
+                <el-button @click="importVisible = false">关闭</el-button>
+                <el-button type="primary" :loading="importing" :disabled="!importFile" @click="onImport">
+                    开始导入
+                </el-button>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { Download, Plus, Refresh, Search, Upload, UploadFilled } from '@element-plus/icons-vue'
 import { questionApi, knowledgePointApi, courseApi } from '@/api/question'
+import { downloadFile } from '@/utils/download'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
@@ -232,6 +292,57 @@ const rows = ref([])
 const total = ref(0)
 const courseOptions = ref([])
 const knowledgeOptions = ref([])
+
+// ===== Excel 批量导入 =====
+const importVisible = ref(false)
+const importing = ref(false)
+const importFile = ref(null)
+const fileList = ref([])
+const importResult = ref(null)
+
+function onFileChange(file) {
+    importFile.value = file.raw
+    fileList.value = [file]
+}
+
+function resetImport() {
+    importFile.value = null
+    fileList.value = []
+    importResult.value = null
+}
+
+async function onDownloadTemplate() {
+    try {
+        const name = await downloadFile('/questions/import/template', '题库导入模板.xlsx')
+        ElMessage.success(`已下载 ${name}`)
+    } catch (e) {
+        ElMessage.error(e.message || '模板下载失败')
+    }
+}
+
+async function onImport() {
+    if (!importFile.value) {
+        ElMessage.warning('请先选择 .xlsx 文件')
+        return
+    }
+    importing.value = true
+    importResult.value = null
+    try {
+        const res = await questionApi.importQuestions(importFile.value)
+        importResult.value = res
+        if (res.success > 0) {
+            ElMessage.success(`成功导入 ${res.success} 道题`)
+            await load()
+        }
+        if (res.failed > 0) {
+            ElMessage.warning(`${res.failed} 行未导入，请查看下方失败明细`)
+        }
+    } catch {
+        // 文件格式等错误由拦截器提示
+    } finally {
+        importing.value = false
+    }
+}
 
 const query = reactive({
     page: 1, size: 10,
@@ -483,4 +594,13 @@ onMounted(() => {
 .option-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .option-label { width: 20px; font-weight: 600; color: #909399; }
 .hint { font-size: 12px; color: #909399; line-height: 1.6; margin-top: 2px; }
+.import-actions { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.ok { color: #67c23a; font-weight: 600; }
+.bad { color: #f56c6c; font-weight: 600; }
+.error-box {
+  margin-top: 12px; max-height: 220px; overflow-y: auto;
+  background: #fef0f0; border: 1px solid #fbc4c4; border-radius: 4px; padding: 8px 12px;
+}
+.error-title { font-weight: 600; color: #f56c6c; margin-bottom: 6px; }
+.error-line { font-size: 12px; color: #c45656; line-height: 1.8; }
 </style>

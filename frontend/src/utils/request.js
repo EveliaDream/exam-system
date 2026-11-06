@@ -31,6 +31,11 @@ request.interceptors.request.use(
 // ===== 响应拦截器 =====
 request.interceptors.response.use(
     response => {
+        // 二进制下载（Excel 等）不走 { code, message, data } 约定，
+        // 直接返回完整 response，让调用方能读 Content-Disposition 里的文件名
+        if (response.config?.responseType === 'blob') {
+            return response
+        }
         const res = response.data
         // 后端约定 code === 0 为成功
         if (res && typeof res.code !== 'undefined') {

@@ -85,6 +85,17 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!--
+            Excel 导入导出：成绩单导出 + 题库批量导入都用这一套。
+            选 POI 而不是自己拼 SpreadsheetML：xlsx 本质是 zip+XML，
+            手写容易在样式、共享字符串、日期格式上出错，而 POI 是事实标准。
+        -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.4.1</version>
+        </dependency>
+
         <!-- ===== 开发效率 ===== -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

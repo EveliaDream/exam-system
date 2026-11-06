@@ -26,6 +26,19 @@ export const questionApi = {
     /** 启用 / 停用 */
     toggleEnabled(id, enabled) {
         return request.put(`/questions/${id}/enabled`, null, { params: { enabled } })
+    },
+
+    /**
+     * Excel 批量导入。
+     * 注意要手动让浏览器设置 multipart 边界，不能自己写 Content-Type。
+     */
+    importQuestions(file) {
+        const form = new FormData()
+        form.append('file', file)
+        return request.post('/questions/import', form, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 60000
+        })
     }
 }
 

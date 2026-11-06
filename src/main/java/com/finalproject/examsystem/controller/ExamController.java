@@ -11,8 +11,10 @@ import com.finalproject.examsystem.dto.exam.ExamSaveRequest;
 import com.finalproject.examsystem.dto.exam.ExamScheduleRequest;
 import com.finalproject.examsystem.dto.exam.RandomAssembleRequest;
 import com.finalproject.examsystem.service.ExamService;
+import com.finalproject.examsystem.service.ExcelService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,6 +39,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class ExamController {
 
     private final ExamService examService;
+    private final ExcelService excelService;
+
+    /**
+     * 导出成绩单（.xlsx）。
+     * <p>
+     * 数据来自与「学情分析看板」相同的统计方法，保证页面与导出口径一致。
+     */
+    @GetMapping("/{id}/export/scores")
+    public ResponseEntity<byte[]> exportScores(@PathVariable Long id) {
+        return QuestionController.download(excelService.exportScores(id), "xlsx");
+    }
 
     /** 考试列表：只返回当前教师创建的考试 */
     @GetMapping

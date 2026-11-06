@@ -14,6 +14,12 @@ spring:
 server:
   port: 8080
 
+spring.servlet.multipart:
+  # 题库 Excel 导入：单文件上限 5MB、整体请求上限 10MB
+  # （默认 1MB 对含格式的 xlsx 偏小，500 行题目很容易超过）
+  max-file-size: 5MB
+  max-request-size: 10MB
+
 # ===== 考试系统业务配置 =====
 exam:
   jwt:

@@ -7,7 +7,10 @@
                     <span class="title">{{ data.title || '学情分析' }}</span>
                     <el-tag size="small" type="info">总分 {{ data.totalScore }} · 及格线 {{ data.passScore }}</el-tag>
                 </div>
-                <el-button :icon="Refresh" @click="load">刷新</el-button>
+                <div>
+                    <el-button :icon="Download" :loading="exporting" @click="onExport">导出成绩单</el-button>
+                    <el-button :icon="Refresh" @click="load">刷新</el-button>
+                </div>
             </div>
         </el-card>
 
@@ -181,15 +184,31 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { ArrowLeft, Refresh } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { ArrowLeft, Download, Refresh } from '@element-plus/icons-vue'
 import { analyticsApi } from '@/api/analytics'
+import { downloadFile } from '@/utils/download'
 
 const route = useRoute()
 const examId = Number(route.params.examId)
 const MIN_SAMPLE = 30
 
 const loading = ref(false)
+const exporting = ref(false)
 const data = ref({})
+
+/** 导出成绩单：后端直接返回 .xlsx，前端只负责触发保存 */
+async function onExport() {
+    exporting.value = true
+    try {
+        const name = await downloadFile(`/exams/${examId}/export/scores`, '成绩单.xlsx')
+        ElMessage.success(`已导出 ${name}`)
+    } catch (e) {
+        ElMessage.error(e.message || '导出失败')
+    } finally {
+        exporting.value = false
+    }
+}
 
 function pct(v) {
     return `${Math.round((v || 0) * 100)}%`
