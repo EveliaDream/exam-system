@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -45,10 +46,12 @@ public class ExamController {
      * 导出成绩单（.xlsx）。
      * <p>
      * 数据来自与「学情分析看板」相同的统计方法，保证页面与导出口径一致。
+     * classId 可选：同一次考试发布给多个班时，教师可以只导出某个班。
      */
     @GetMapping("/{id}/export/scores")
-    public ResponseEntity<byte[]> exportScores(@PathVariable Long id) {
-        return QuestionController.download(excelService.exportScores(id), "xlsx");
+    public ResponseEntity<byte[]> exportScores(@PathVariable Long id,
+                                               @RequestParam(required = false) Long classId) {
+        return QuestionController.download(excelService.exportScores(id, classId), "xlsx");
     }
 
     /** 考试列表：只返回当前教师创建的考试 */

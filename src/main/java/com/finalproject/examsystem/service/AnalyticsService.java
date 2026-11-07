@@ -60,6 +60,7 @@ public class AnalyticsService {
     private final ExamQuestionRepository examQuestionRepository;
     private final AnswerRepository answerRepository;
     private final QuestionKnowledgeRepository questionKnowledgeRepository;
+    private final com.finalproject.examsystem.repository.StudentClassRepository studentClassRepository;
 
     private static final List<RecordStatus> SUBMITTED =
             List.of(RecordStatus.SUBMITTED, RecordStatus.AUTO_SUBMITTED);
@@ -71,9 +72,11 @@ public class AnalyticsService {
      * <p>
      * 数据范围：只统计**已交卷**的记录。未交卷的作答不完整，纳入平均分会把成绩拉低，
      * 反而失真——教师看到"平均分 40"时应当能确定这 40 是真实作答的结果。
+     * <p>
+     * classId 非空时只统计该班学生：同一次考试可能发布给多个班，教师往往只关心某一个班的学情。
      */
     @Transactional(readOnly = true)
-    public ExamAnalyticsResponse analyzeExam(Long examId) {
+    public ExamAnalyticsResponse analyzeExam(Long examId, Long classId) {
         Exam exam = examRepository.findByIdAndDeletedFalse(examId)
                 .orElseThrow(() -> BusinessException.of(ErrorCode.EXAM_NOT_FOUND));
         if (exam.getCreatedBy() != null
@@ -81,7 +84,19 @@ public class AnalyticsService {
             throw BusinessException.of(ErrorCode.EXAM_NOT_OWNED);
         }
 
-        List<ExamRecord> records = examRecordRepository.findByExamIdAndStatusIn(examId, SUBMITTED);
+        List<ExamRecord> examRecords = examRecordRepository.findByExamId(examId);
+        if (classId != null) {
+            // 班级过滤放在内存里做而不是写进 JPQL：单场考试的记录数最多一个班的人数，
+            // 而多一个查询分支就多一处可能不一致的统计口径
+            examRecords = examRecords.stream()
+                    .filter(r -> inClass(r, classId))
+                    .toList();
+        }
+        List<ExamRecord> records = examRecords.stream()
+                .filter(r -> r.getStatus() != null && SUBMITTED.contains(r.getStatus()))
+                .toList();
+        int participantCount = examRecords.size();
+        String className = classId == null ? null : resolveClassName(classId);
         List<ExamQuestion> snapshots =
                 examQuestionRepository.findByExamIdAndAttemptNoOrderBySortOrderAsc(examId, 1);
         Map<Long, ExamQuestion> eqById = new LinkedHashMap<>();
@@ -112,8 +127,7 @@ public class AnalyticsService {
                 exam.getTotalScore(),
                 exam.getPassScore(),
                 // 参与人数 = 已产生记录的人数（含未交卷），用于提示"还有人没交卷"
-                (int) examRecordRepository.countByExamIdAndStatusIn(
-                        examId, List.of(RecordStatus.IN_PROGRESS, RecordStatus.NOT_STARTED)) + records.size(),
+                participantCount,
                 records.size(),
                 sufficient,
                 round(avgScore),
@@ -124,7 +138,27 @@ public class AnalyticsService {
                 buildDistribution(records, exam),
                 buildQuestionStats(snapshots, allAnswers, avgRate, sufficient),
                 buildKnowledgeStats(snapshots, allAnswers, kpByQuestion),
-                buildStudentRows(records));
+                buildStudentRows(records),
+                classId,
+                className);
+    }
+
+    /** 不按班级过滤时的重载，供内部调用 */
+    @Transactional(readOnly = true)
+    public ExamAnalyticsResponse analyzeExam(Long examId) {
+        return analyzeExam(examId, null);
+    }
+
+    private boolean inClass(ExamRecord r, Long classId) {
+        return r.getStudent() != null
+                && r.getStudent().getStudentClass() != null
+                && classId.equals(r.getStudent().getStudentClass().getId());
+    }
+
+    private String resolveClassName(Long classId) {
+        return studentClassRepository.findById(classId)
+                .map(c -> c.getName())
+                .orElse("未知班级");
     }
 
     // ==================== 学生端：知识点分析 ====================
@@ -233,6 +267,7 @@ public class AnalyticsService {
                     eq.getType() == null ? null : eq.getType().getLabel(),
                     eq.getStem(),
                     eq.getOptions() == null ? List.of() : eq.getOptions(),
+                    eq.getImageUrl(),
                     eq.getAnswer() == null ? List.of() : eq.getAnswer(),
                     a == null || a.getStudentAnswer() == null ? List.of() : a.getStudentAnswer(),
                     a == null ? 0 : (a.getScore() == null ? 0 : a.getScore()),

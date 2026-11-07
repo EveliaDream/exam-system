@@ -29,6 +29,9 @@ exam:
     expire-millis: 7200000
     header: Authorization
     prefix: "Bearer "
+  upload:
+    # 题干配图存储目录；相对路径基于启动工作目录
+    dir: ${EXAM_UPLOAD_DIR:uploads}
 
 logging:
   level:

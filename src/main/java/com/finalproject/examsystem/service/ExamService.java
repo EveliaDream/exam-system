@@ -8,6 +8,7 @@ import com.finalproject.examsystem.domain.Exam;
 import com.finalproject.examsystem.domain.ExamClass;
 import com.finalproject.examsystem.domain.ExamPhase;
 import com.finalproject.examsystem.domain.ExamQuestion;
+import com.finalproject.examsystem.domain.ExamRecord;
 import com.finalproject.examsystem.domain.ExamStatus;
 import com.finalproject.examsystem.domain.KnowledgePoint;
 import com.finalproject.examsystem.domain.Question;
@@ -46,6 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -346,6 +348,9 @@ public class ExamService {
      * 我的考试：只返回发布给本人所在班级的考试。
      * <p>
      * 未分班学生返回空列表——没有班级就没有考试归属，这是数据隔离的自然结果。
+     * <p>
+     * 多轮考试信息在这里一次算清：已交卷次数、是否有进行中的作答、最近一次记录 id。
+     * 前端据此决定显示「进入考试」还是「再考一次」还是「查看成绩」。
      */
     @Transactional(readOnly = true)
     public List<StudentExamResponse> myExams() {
@@ -353,12 +358,30 @@ public class ExamService {
         if (student.getStudentClass() == null) {
             return List.of();
         }
+        // 一次取出该生全部作答记录，按考试分组，避免逐场考试查询（N+1）
+        Map<Long, List<ExamRecord>> recordsByExam =
+                examRecordRepository.findByStudentIdOrderByIdDesc(student.getId()).stream()
+                        .collect(Collectors.groupingBy(r -> r.getExam().getId()));
+
         LocalDateTime now = LocalDateTime.now();
         return examRepository.findVisibleToClass(student.getStudentClass().getId()).stream()
-                .map(e -> StudentExamResponse.from(
-                        e,
-                        (int) examQuestionRepository.countByExamIdAndAttemptNo(e.getId(), CURRENT_ATTEMPT),
-                        resolvePhase(e, now)))
+                .map(e -> {
+                    List<ExamRecord> mine = recordsByExam.getOrDefault(e.getId(), List.of());
+                    int used = (int) mine.stream().filter(ExamRecord::finished).count();
+                    boolean inProgress = mine.stream().anyMatch(r -> !r.finished());
+                    Long lastRecordId = mine.stream()
+                            .filter(ExamRecord::finished)
+                            .max(Comparator.comparing(ExamRecord::getAttemptNo))
+                            .map(ExamRecord::getId)
+                            .orElse(null);
+                    return StudentExamResponse.from(
+                            e,
+                            (int) examQuestionRepository.countByExamIdAndAttemptNo(e.getId(), CURRENT_ATTEMPT),
+                            resolvePhase(e, now),
+                            used,
+                            inProgress,
+                            lastRecordId);
+                })
                 .toList();
     }
 
@@ -466,6 +489,7 @@ public class ExamService {
                     eq.getAnswer() == null ? List.of() : eq.getAnswer(),
                     eq.getScore(),
                     eq.getAnalysis(),
+                    eq.getImageUrl(),
                     eq.getSortOrder(),
                     kps.stream().map(KnowledgePoint::getId).toList(),
                     kps.stream().map(KnowledgePoint::getName).toList());

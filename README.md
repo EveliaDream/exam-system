@@ -2,8 +2,8 @@
 
 基于 Spring Boot 4 + Vue 3 的在线考试系统。面向大学软件工程综合实践，功能聚焦"客观题考试"闭环，不涉及 AI 判分等复杂技术。
 
-**当前进度：阶段 0~6 + 收尾完善全部完成**（工程骨架、认证权限、用户班级、题库知识点、组卷发布、在线作答与判分、学情分析、改密与 Excel 导入导出）。
-后端 126 个测试全绿，端到端检查 41 项全通过。
+**当前进度：全部完成**（阶段 0~6 + 收尾完善 + 增强四项）。
+后端 141 个测试全绿，端到端检查 41 项全通过。
 
 ---
 
@@ -138,8 +138,11 @@ node docs/scripts/e2e-phase2.mjs     # 阶段 2：用户与班级管理业务规
 | 我的成绩（学生） | ✅ | `GET /api/my/records` |
 | 学情分析（教师） | ✅ | `GET /api/analytics/exams/{examId}` |
 | 学情分析（学生） | ✅ | `GET /api/my/records/{id}/analysis`、`GET /api/my/records/{id}/detail` |
-| 成绩单导出（教师） | ✅ | `GET /api/exams/{id}/export/scores`（xlsx） |
+| 成绩单导出（教师） | ✅ | `GET /api/exams/{id}/export/scores`（xlsx，支持 `?classId=` 按班导出） |
 | 自助改密（教师/学生） | ✅ | `PUT /api/auth/password`（顶栏「修改密码」） |
+| 多轮考试（补考） | ✅ | 由考试 `maxAttempt` 控制，进入考试时自动分配轮次 |
+| 题干配图 | ✅ | `POST /api/files/image`（上传）、`GET /api/files/{name}`（匿名读取） |
+| 操作日志（教师） | ✅ | `GET /api/logs`、`GET /api/logs/actions` |
 
 > **知识点与学情分析的关系**：系统的学情分析口径是「按知识点聚合作答正确率」。
 > 因此知识点必须在录题时就标注（一道题可挂多个），否则该题的作答不会计入任何统计。
@@ -229,7 +232,8 @@ exam-system/
 │   ├── security/                JWT 生成校验 / 过滤器 / 用户主体 / 401·403 处理器
 │   └── service/                 Auth / User / Class / Question / KnowledgePoint / Exam /
 │                                 ExamTaking（作答与判分）/ ObjectiveGrader（判分纯函数）/
-│                                 Analytics（学情分析）/ Excel（成绩单导出、题库导入）
+│                                 Analytics（学情分析）/ Excel（成绩单导出、题库导入）/
+│                                 FileStorage（题干配图）/ OperationLog（审计日志）
 ├── src/main/resources/
 │   ├── application.yml          公共配置
 │   ├── application-dev.yml      MySQL（默认）+ 种子数据
@@ -245,19 +249,21 @@ exam-system/
 │   ├── ExamApiTest.java         组卷、发布校验与状态流转
 │   ├── ExamTakingApiTest.java   作答、自动保存、判分与幂等
 │   ├── AnalyticsApiTest.java    学情分析：掌握度、样本门槛、数据归属
-│   └── ExcelApiTest.java        Excel 导入导出：逐行容错、模板、越权
+│   ├── ExcelApiTest.java        Excel 导入导出：逐行容错、模板、越权
+│   ├── MultiAttemptApiTest.java 多轮考试：轮次分配、次数用尽、成绩独立
+│   └── ExtrasApiTest.java       配图上传与快照、班级筛选、操作日志
 ├── src/test/java/.../service/
 │   └── ObjectiveGraderTest.java 判分规则单元测试（纯函数）
 └── frontend/
     ├── vite.config.js           代理 /api → 8080；build 输出到后端静态目录
     └── src/
-        ├── api/                 接口定义（auth / student / class / question / exam / answer / analytics）
+        ├── api/                 接口定义（auth / student / class / question / exam / answer / analytics / log / file）
         ├── layouts/             AdminLayout（侧边菜单 + 顶栏 + 修改密码）
         ├── router/              路由 + 登录/角色守卫
         ├── stores/              Pinia 登录态
         ├── utils/               Axios 封装（自动带 token、401 跳登录）+ 文件下载
         └── views/               登录 / 工作台 / 学生 / 班级 / 题库 / 知识点 /
-                                 考试列表 / 考试编辑 / 学情分析 /
+                                 考试列表 / 考试编辑 / 学情分析 / 操作日志 /
                                  我的考试 / 在线作答 / 考试结果 / 我的成绩
 ```
 
@@ -328,28 +334,32 @@ node docs/scripts/seed-demo-attempts.mjs
 
 ---
 
-## 收尾完善功能
+## 收尾完善与增强功能
 
-除六个阶段外，还补齐了三项日常使用必需的能力：
+除六个阶段外，还补齐了日常使用必需的能力：
 
 | 功能 | 入口 | 说明 |
 |---|---|---|
 | 自助改密 | 顶栏右上角菜单 →「修改密码」 | 教师与学生共用。改密后 `tokenVersion + 1`，当前登录状态立即失效，需用新密码重新登录 |
-| 成绩单导出 | 考试管理 → 学情分析 →「导出成绩单」 | 生成 .xlsx：标题、概要（总分/及格线/人数/平均分/及格率）、表头冻结、学生明细 |
+| 成绩单导出 | 考试管理 → 学情分析 →「导出成绩单」 | 生成 .xlsx：标题、概要（总分/及格线/人数/平均分/及格率）、表头冻结、学生明细；可按班级导出 |
 | 题库批量导入 | 题库管理 →「Excel 导入」 | 支持四种题型；先下载模板；**逐行容错**，失败行返回行号与原因，其余行照常入库 |
+| 多轮考试 | 组卷时设置「限考次数」 | 学生端显示「已用 / 限考」，支持下「再考一次」；每轮独立记录与成绩 |
+| 题干配图 | 题目表单 →「上传图片」 | 支持 png/jpg/gif/webp，≤2MB；组卷时随题干一并快照，历史试卷不受题库改图影响 |
+| 学生端班级筛选 | 学情分析 → 班级下拉 | 同一次考试发布给多个班时，可只看某个班的统计并单独导出 |
+| 操作日志 | 侧边菜单 →「操作日志」 | 自动记录成功的写操作（谁、何时、对什么对象）；可按动作/关键字/时间筛选，日志只读不可改 |
 
-Excel 相关实现要点见 [docs/DEV-NOTES.md](docs/DEV-NOTES.md) 第十三节。
+Excel 相关实现要点见 [docs/DEV-NOTES.md](docs/DEV-NOTES.md) 第十三节，
+多轮考试、配图、日志的设计取舍见第十四节。
 
 ---
 
 ## 下一步
 
-详见 [docs/ROADMAP.md](docs/ROADMAP.md)。当前进度：**阶段 0~6 + 收尾完善全部完成**。
+详见 [docs/ROADMAP.md](docs/ROADMAP.md)。当前进度：**全部完成**。
 
 可选的后续扩展（不影响交付）：
 
-- 图片题干上传（当前题干为纯文本）
-- 多轮考试（`exam_question.attempt_no` 与 `exam_record.attempt_no` 已预留，`max_attempt` 已可配置，
-  目前作答逻辑固定为第 1 轮）
-- 成绩单按班级筛选与分班导出
-- 操作日志查询页面（`operation_log` 表已建，写入逻辑在关键操作中已接入）
+- 多套卷（`exam_question.attempt_no` 已预留，目前补考复用同一份快照以保证难度一致）
+- 成绩单按分数段/关键字筛选后导出
+- 操作日志导出与保留策略（`operation_log` 会持续增长，生产环境需定期归档）
+- 图片题干的裁剪压缩（当前限制 2MB，未做服务端缩放）

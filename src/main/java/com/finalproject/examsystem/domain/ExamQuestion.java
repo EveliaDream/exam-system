@@ -69,6 +69,15 @@ public class ExamQuestion {
     @Column(name = "analysis", columnDefinition = "TEXT")
     private String analysis;
 
+    /**
+     * 题干配图快照。
+     * <p>
+     * 必须一并快照：教师后来在题库里换掉图片，已发布的考试仍应显示当初那张图，
+     * 否则学生复习时看到的题干与考试时看到的不一致。
+     */
+    @Column(name = "image_url", length = 255)
+    private String imageUrl;
+
     /** 该题在本场考试中的最终分值 */
     @Column(name = "score", nullable = false)
     private Integer score = 5;
@@ -87,6 +96,7 @@ public class ExamQuestion {
         eq.setOptions(question.getOptions() == null ? List.of() : List.copyOf(question.getOptions()));
         eq.setAnswer(question.correctAnswer() == null ? List.of() : List.copyOf(question.correctAnswer()));
         eq.setAnalysis(question.getAnalysis());
+        eq.setImageUrl(question.getImageUrl());
         eq.setScore(score);
         eq.setSortOrder(sortOrder);
         return eq;

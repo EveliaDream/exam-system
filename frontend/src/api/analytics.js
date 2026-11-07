@@ -3,8 +3,10 @@ import request from '@/utils/request'
 /** 学情分析接口。 */
 export const analyticsApi = {
     /** 教师端：一场考试的学情看板（成绩统计 + 难度贴合 + 知识点掌握 + 成绩表） */
-    exam(examId) {
-        return request.get(`/analytics/exams/${examId}`)
+    exam(examId, classId) {
+        return request.get(`/analytics/exams/${examId}`, {
+            params: classId == null ? {} : { classId }
+        })
     },
 
     /** 学生端：我的知识点掌握度与薄弱知识点 */

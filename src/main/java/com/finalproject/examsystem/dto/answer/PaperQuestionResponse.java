@@ -17,6 +17,8 @@ public record PaperQuestionResponse(Long questionId,
                                     String typeLabel,
                                     String stem,
                                     List<String> options,
+                                    /** 题干配图地址（快照），无配图时为 null */
+                                    String imageUrl,
                                     Integer score,
                                     Integer sortOrder) {
 
@@ -27,6 +29,7 @@ public record PaperQuestionResponse(Long questionId,
                 eq.getType() == null ? null : eq.getType().getLabel(),
                 eq.getStem(),
                 eq.getOptions() == null ? List.of() : eq.getOptions(),
+                eq.getImageUrl(),
                 eq.getScore(),
                 eq.getSortOrder());
     }

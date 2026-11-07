@@ -208,6 +208,26 @@
                     </el-col>
                 </el-row>
 
+                <el-form-item label="配图">
+                    <div class="image-field">
+                        <el-upload
+                            v-if="!form.imageUrl"
+                            :show-file-list="false"
+                            :auto-upload="false"
+                            accept=".png,.jpg,.jpeg,.gif,.webp"
+                            :on-change="onImageChange"
+                        >
+                            <el-button :icon="Picture" :loading="uploading">上传图片</el-button>
+                        </el-upload>
+                        <template v-else>
+                            <el-image :src="form.imageUrl" fit="contain" class="image-preview"
+                                      :preview-src-list="[form.imageUrl]" preview-teleported/>
+                            <el-button link type="danger" @click="form.imageUrl = ''">移除</el-button>
+                        </template>
+                        <div class="hint">可选。支持 png/jpg/gif/webp，不超过 2MB；组卷时会一并快照。</div>
+                    </div>
+                </el-form-item>
+
                 <el-form-item label="解析">
                     <el-input v-model="form.analysis" type="textarea" :rows="2"
                               placeholder="学生查看答卷时展示"/>
@@ -280,14 +300,16 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Download, Plus, Refresh, Search, Upload, UploadFilled } from '@element-plus/icons-vue'
+import { Download, Picture, Plus, Refresh, Search, Upload, UploadFilled } from '@element-plus/icons-vue'
 import { questionApi, knowledgePointApi, courseApi } from '@/api/question'
+import { fileApi } from '@/api/file'
 import { downloadFile } from '@/utils/download'
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
 const loading = ref(false)
 const saving = ref(false)
+const uploading = ref(false)
 const rows = ref([])
 const total = ref(0)
 const courseOptions = ref([])
@@ -361,6 +383,7 @@ const form = reactive({
     score: 5,
     difficulty: 'MEDIUM',
     analysis: '',
+    imageUrl: '',
     courseId: null,
     knowledgePointIds: [],
     enabled: true
@@ -474,10 +497,30 @@ function resetQuery() {
 function onPageChange(p) { query.page = p; load() }
 function onSizeChange(s) { query.size = s; query.page = 1; load() }
 
+/** 上传配图：先传到 /api/files/image，拿到 url 再随题目一起保存 */
+async function onImageChange(file) {
+    const raw = file.raw
+    if (!raw) return
+    if (raw.size > 2 * 1024 * 1024) {
+        ElMessage.warning('图片不能超过 2MB')
+        return
+    }
+    uploading.value = true
+    try {
+        const res = await fileApi.uploadImage(raw)
+        form.imageUrl = res.url
+        ElMessage.success('图片已上传')
+    } catch {
+        // 类型/大小等错误由拦截器提示
+    } finally {
+        uploading.value = false
+    }
+}
+
 function openCreate() {
     Object.assign(form, {
         id: null, type: 'SINGLE', stem: '', options: ['', ''],
-        answer: [], score: 5, difficulty: 'MEDIUM', analysis: '',
+        answer: [], score: 5, difficulty: 'MEDIUM', analysis: '', imageUrl: '',
         courseId: null, knowledgePointIds: [], enabled: true
     })
     formVisible.value = true
@@ -493,6 +536,7 @@ function openEdit(row) {
         score: row.score,
         difficulty: row.difficulty,
         analysis: row.analysis || '',
+        imageUrl: row.imageUrl || '',
         courseId: row.courseId,
         knowledgePointIds: (row.knowledgePoints || []).map(k => k.id),
         enabled: row.enabled
@@ -533,6 +577,7 @@ async function onSubmit() {
             score: form.score,
             difficulty: form.difficulty,
             analysis: form.analysis || null,
+            imageUrl: form.imageUrl || null,
             courseId: form.courseId,
             knowledgePointIds: form.knowledgePointIds,
             enabled: form.enabled
@@ -595,6 +640,8 @@ onMounted(() => {
 .option-label { width: 20px; font-weight: 600; color: #909399; }
 .hint { font-size: 12px; color: #909399; line-height: 1.6; margin-top: 2px; }
 .import-actions { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.image-field { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.image-preview { width: 120px; height: 80px; border: 1px solid #dcdfe6; border-radius: 4px; }
 .ok { color: #67c23a; font-weight: 600; }
 .bad { color: #f56c6c; font-weight: 600; }
 .error-box {

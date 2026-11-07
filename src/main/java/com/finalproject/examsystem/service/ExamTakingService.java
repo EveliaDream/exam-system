@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +54,14 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class ExamTakingService {
 
-    private static final int CURRENT_ATTEMPT = 1;
+    /**
+     * 组卷快照的轮次。
+     * <p>
+     * 目前所有轮次共用第 1 份快照：补考与首考题目一致，
+     * 避免同一场考试两次难度不同引发公平性争议。
+     * exam_question.attempt_no 保留，是为日后「多套卷」预留。
+     */
+    private static final int SNAPSHOT_ATTEMPT = 1;
 
     private final ExamRepository examRepository;
     private final ExamQuestionRepository examQuestionRepository;
@@ -65,16 +73,19 @@ public class ExamTakingService {
     // ==================== 进入考试 / 继续作答 ====================
 
     /**
-     * 开始或继续作答。
+     * 开始或继续作答（支持多轮：补考 / 重考）。
      * <p>
-     * 三种情况：
-     * <ul>
-     *   <li>还没作答过 → 创建记录、预填答题行、返回试卷</li>
-     *   <li>有进行中的记录 → 返回已有试卷与已保存答案（断线重进）</li>
-     *   <li>已交卷 / 已超时 → 返回 status 为已结束的空试卷，由前端跳转成绩页</li>
-     * </ul>
-     * 用「返回空试卷 + status」而不是抛异常，是为了让前端能用同一套渲染逻辑处理，
+     * 判断顺序很重要：
+     * <ol>
+     *   <li>有进行中的记录 → 恢复它（断线重进优先于一切）</li>
+     *   <li>已交卷次数 &lt; 限考次数 → 新建下一轮记录</li>
+     *   <li>次数用尽 → 返回最近一次的已结束试卷壳，由前端跳成绩页</li>
+     * </ol>
+     * 用「返回空试卷 + status」而不是抛异常，前端能用同一套渲染逻辑处理，
      * 不必在错误分支里再解析错误码。
+     * <p>
+     * 多轮共用同一份组卷快照（exam_question.attempt_no = 1）：
+     * 补考题目与首次一致，避免"同一场考试两次难度不同"引发的公平性争议。
      */
     @Transactional
     public ExamPaperResponse start(Long examId) {
@@ -84,30 +95,40 @@ public class ExamTakingService {
         }
         Exam exam = requireVisibleExam(examId, student.getStudentClass().getId());
 
-        ExamRecord record = examRecordRepository
-                .findTopByExamIdAndStudentIdOrderByAttemptNoDesc(examId, student.getId())
-                .orElse(null);
+        List<ExamRecord> mine = examRecordRepository.findByExamIdAndStudentId(examId, student.getId());
 
-        if (record == null) {
-            record = createRecord(exam, student);
-        } else if (record.finished()) {
-            // 已完成：返回已结束的试卷壳，前端据此跳到成绩页
-            return buildPaper(exam, record, List.of(), List.of());
+        // 1) 有未完成的记录：继续作答
+        ExamRecord record = mine.stream().filter(r -> !r.finished()).findFirst().orElse(null);
+        if (record != null) {
+            if (isExpired(record, exam)) {
+                doGrade(exam, record, true);
+                log.info("记录 {} 超时，已自动交卷", record.getId());
+                return buildPaper(exam, record, List.of(), List.of());
+            }
+            return buildPaperWithAnswers(exam, record);
         }
 
-        // 进行中但已超时：先自动交卷，再把状态回给前端
-        if (isExpired(record, exam)) {
-            doGrade(exam, record, true);
-            log.info("记录 {} 超时，已自动交卷", record.getId());
-            return buildPaper(exam, record, List.of(), List.of());
+        // 2) 还有剩余次数：新建下一轮
+        long finished = mine.stream().filter(ExamRecord::finished).count();
+        int maxAttempt = exam.getMaxAttempt() == null ? 1 : exam.getMaxAttempt();
+        if (finished < maxAttempt) {
+            record = createRecord(exam, student, (int) finished + 1);
+            return buildPaperWithAnswers(exam, record);
         }
 
-        List<ExamQuestion> snapshots = loadSnapshots(examId);
-        List<Answer> answers = answerRepository.findByRecordId(record.getId());
-        List<PaperQuestionResponse> questions = snapshots.stream()
+        // 3) 次数用尽：返回最近一次结果，前端据此跳成绩页
+        ExamRecord last = mine.stream()
+                .max(Comparator.comparing(ExamRecord::getAttemptNo))
+                .orElseThrow(() -> BusinessException.of(ErrorCode.RECORD_NOT_FOUND));
+        return buildPaper(exam, last, List.of(), List.of());
+    }
+
+    /** 组装「可作答」的试卷：题面 + 已保存答案 */
+    private ExamPaperResponse buildPaperWithAnswers(Exam exam, ExamRecord record) {
+        List<PaperQuestionResponse> questions = loadSnapshots(exam.getId()).stream()
                 .map(PaperQuestionResponse::from)
                 .toList();
-        List<SavedAnswerView> saved = answers.stream()
+        List<SavedAnswerView> saved = answerRepository.findByRecordId(record.getId()).stream()
                 .filter(Answer::answered)
                 .map(a -> new SavedAnswerView(a.getQuestionId(), a.getStudentAnswer()))
                 .toList();
@@ -295,11 +316,11 @@ public class ExamTakingService {
                 record.getStatus() == RecordStatus.AUTO_SUBMITTED);
     }
 
-    private ExamRecord createRecord(Exam exam, User student) {
+    private ExamRecord createRecord(Exam exam, User student, int attemptNo) {
         ExamRecord record = new ExamRecord();
         record.setExam(exam);
         record.setStudent(student);
-        record.setAttemptNo(CURRENT_ATTEMPT);
+        record.setAttemptNo(attemptNo);
         record.setStartTime(LocalDateTime.now());
         record.setStatus(RecordStatus.IN_PROGRESS);
         record.setSwitchScreenCount(0);
@@ -312,7 +333,8 @@ public class ExamTakingService {
                 .toList();
         answerRepository.saveAll(rows);
 
-        log.info("学生 {} 开始考试 {}，预填 {} 题", student.getId(), exam.getId(), rows.size());
+        log.info("学生 {} 开始考试 {}（第 {} 次），预填 {} 题",
+                student.getId(), exam.getId(), attemptNo, rows.size());
         return record;
     }
 
@@ -345,7 +367,7 @@ public class ExamTakingService {
 
     private List<ExamQuestion> loadSnapshots(Long examId) {
         return examQuestionRepository
-                .findByExamIdAndAttemptNoOrderBySortOrderAsc(examId, CURRENT_ATTEMPT);
+                .findByExamIdAndAttemptNoOrderBySortOrderAsc(examId, SNAPSHOT_ATTEMPT);
     }
 
     private boolean isExpired(ExamRecord record, Exam exam) {

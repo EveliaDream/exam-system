@@ -30,6 +30,10 @@
                         <el-icon><Tickets/></el-icon>
                         <span>考试管理</span>
                     </el-menu-item>
+                    <el-menu-item index="/logs">
+                        <el-icon><Document/></el-icon>
+                        <span>操作日志</span>
+                    </el-menu-item>
                 </template>
 
                 <!-- 学生菜单 -->

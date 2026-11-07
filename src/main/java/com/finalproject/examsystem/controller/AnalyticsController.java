@@ -8,6 +8,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -25,9 +26,10 @@ public class AnalyticsController {
 
     private final AnalyticsService analyticsService;
 
-    /** 考试学情分析（只能看自己创建的考试） */
+    /** 考试学情分析（只能看自己创建的考试）；classId 可选，用于只看某个班 */
     @GetMapping("/{examId}")
-    public Result<ExamAnalyticsResponse> analyze(@PathVariable Long examId) {
-        return Result.ok(analyticsService.analyzeExam(examId));
+    public Result<ExamAnalyticsResponse> analyze(@PathVariable Long examId,
+                                                 @RequestParam(required = false) Long classId) {
+        return Result.ok(analyticsService.analyzeExam(examId, classId));
     }
 }

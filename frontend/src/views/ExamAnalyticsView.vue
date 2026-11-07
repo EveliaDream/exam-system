@@ -8,6 +8,10 @@
                     <el-tag size="small" type="info">总分 {{ data.totalScore }} · 及格线 {{ data.passScore }}</el-tag>
                 </div>
                 <div>
+                    <el-select v-model="classId" placeholder="全部班级" clearable style="width: 180px"
+                               @change="load">
+                        <el-option v-for="c in classOptions" :key="c.id" :label="c.name" :value="c.id"/>
+                    </el-select>
                     <el-button :icon="Download" :loading="exporting" @click="onExport">导出成绩单</el-button>
                     <el-button :icon="Refresh" @click="load">刷新</el-button>
                 </div>
@@ -187,6 +191,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, Download, Refresh } from '@element-plus/icons-vue'
 import { analyticsApi } from '@/api/analytics'
+import { examApi } from '@/api/exam'
 import { downloadFile } from '@/utils/download'
 
 const route = useRoute()
@@ -196,12 +201,16 @@ const MIN_SAMPLE = 30
 const loading = ref(false)
 const exporting = ref(false)
 const data = ref({})
+/** 班级筛选：为空表示看全部班级 */
+const classId = ref(null)
+const classOptions = ref([])
 
 /** 导出成绩单：后端直接返回 .xlsx，前端只负责触发保存 */
 async function onExport() {
     exporting.value = true
     try {
-        const name = await downloadFile(`/exams/${examId}/export/scores`, '成绩单.xlsx')
+        const qs = classId.value == null ? '' : `?classId=${classId.value}`
+        const name = await downloadFile(`/exams/${examId}/export/scores${qs}`, '成绩单.xlsx')
         ElMessage.success(`已导出 ${name}`)
     } catch (e) {
         ElMessage.error(e.message || '导出失败')
@@ -239,7 +248,7 @@ function judgeType(code) {
 async function load() {
     loading.value = true
     try {
-        data.value = await analyticsApi.exam(examId)
+        data.value = await analyticsApi.exam(examId, classId.value)
     } catch {
         data.value = {}
     } finally {
@@ -247,7 +256,16 @@ async function load() {
     }
 }
 
-onMounted(load)
+onMounted(async () => {
+    await load()
+    // 班级下拉来自本场考试绑定的班级，避免列出无关班级
+    try {
+        const detail = await examApi.detail(examId)
+        classOptions.value = detail.classes || []
+    } catch {
+        classOptions.value = []
+    }
+})
 </script>
 
 <style scoped>

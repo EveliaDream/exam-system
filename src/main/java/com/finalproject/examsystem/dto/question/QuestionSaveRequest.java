@@ -43,6 +43,10 @@ public record QuestionSaveRequest(
         @Size(max = 2000, message = "解析不能超过 2000 个字符")
         String analysis,
 
+        /** 题干配图地址（先调 /api/files/image 上传，再把返回的 url 填这里） */
+        @Size(max = 255, message = "图片地址过长")
+        String imageUrl,
+
         Long courseId,
 
         /** 关联的知识点 id 列表（一道题可挂多个） */

@@ -27,3 +27,6 @@ spring:
 exam:
   seed:
     enabled: true
+  upload:
+    # 测试/演示模式的图片目录单独放，避免把测试用的图片混进开发环境的 uploads/
+    dir: target/test-uploads

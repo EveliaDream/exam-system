@@ -70,6 +70,12 @@ const routes = [
                 meta: { title: '学情分析', roles: ['TEACHER'] }
             },
             {
+                path: 'logs',
+                name: 'logs',
+                component: () => import('@/views/OperationLogsView.vue'),
+                meta: { title: '操作日志', roles: ['TEACHER'] }
+            },
+            {
                 path: 'my-exams',
                 name: 'my-exams',
                 component: () => import('@/views/MyExamsView.vue'),

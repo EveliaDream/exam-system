@@ -14,6 +14,8 @@ public record ExamQuestionView(Long questionId,
                                List<String> answer,
                                Integer score,
                                String analysis,
+                               /** 题干配图地址（快照），无配图时为 null */
+                               String imageUrl,
                                Integer sortOrder,
                                /** 该题在题库中的知识点，便于教师检查覆盖是否均衡 */
                                List<Long> knowledgePointIds,

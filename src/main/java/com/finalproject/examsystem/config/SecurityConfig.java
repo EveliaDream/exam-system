@@ -6,6 +6,7 @@ import com.finalproject.examsystem.security.RestAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -63,6 +64,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 登录接口与健康检查放行
                         .requestMatchers("/api/auth/login", "/api/health").permitAll()
+                        // 题干配图必须允许匿名读取：<img src> 无法携带 Authorization 头。
+                        // 安全性由「UUID 随机文件名 + 只允许读图片」保证，不依赖鉴权。
+                        .requestMatchers(HttpMethod.GET, "/api/files/**").permitAll()
                         // H2 控制台仅开发期使用
                         .requestMatchers("/h2-console/**").permitAll()
                         .anyRequest().authenticated())

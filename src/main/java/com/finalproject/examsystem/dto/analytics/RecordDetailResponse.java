@@ -24,6 +24,8 @@ public record RecordDetailResponse(
             String typeLabel,
             String stem,
             List<String> options,
+            /** 题干配图地址（快照） */
+            String imageUrl,
             /** 标准答案（交卷后可见） */
             List<String> correctAnswer,
             /** 学生答案 */

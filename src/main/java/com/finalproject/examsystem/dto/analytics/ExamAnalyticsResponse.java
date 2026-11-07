@@ -31,7 +31,10 @@ public record ExamAnalyticsResponse(
         List<ScoreBucket> scoreDistribution,
         List<QuestionStat> questionStats,
         List<KnowledgeStat> knowledgeStats,
-        List<StudentRow> students) {
+        List<StudentRow> students,
+        /** 当前筛选的班级；为空表示全部班级 */
+        Long classId,
+        String className) {
 
     /** 判断类结论的样本门槛：低于该人数时统计量波动大，不足以支撑结论 */
     public static final int MIN_SAMPLE = 30;

@@ -199,6 +199,7 @@ CREATE TABLE exam_question
     options     TEXT,
     answer      TEXT        NOT NULL COMMENT '正确答案快照，判分只读这里',
     analysis    TEXT,
+    image_url   VARCHAR(255) COMMENT '题干配图快照；组卷时一并复制，历史试卷不受题库改图影响',
     score       INT         NOT NULL COMMENT '该题在本场考试中的分值',
     sort_order  INT         NOT NULL DEFAULT 0,
     PRIMARY KEY (exam_id, attempt_no, question_id)

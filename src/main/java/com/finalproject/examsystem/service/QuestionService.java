@@ -221,6 +221,8 @@ public class QuestionService {
         q.setDifficulty(request.difficulty());
         q.setAnalysis(request.analysis() == null || request.analysis().isBlank()
                 ? null : request.analysis().trim());
+        q.setImageUrl(request.imageUrl() == null || request.imageUrl().isBlank()
+                ? null : request.imageUrl().trim());
         q.setEnabled(request.enabled() == null ? Boolean.TRUE : request.enabled());
         q.setCourse(resolveCourse(request.courseId()));
     }

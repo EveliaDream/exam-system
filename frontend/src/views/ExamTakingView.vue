@@ -34,6 +34,9 @@
 
                     <div class="q-stem">{{ q.stem }}</div>
 
+                    <el-image v-if="q.imageUrl" :src="q.imageUrl" fit="contain" class="q-image"
+                              :preview-src-list="[q.imageUrl]" preview-teleported/>
+
                     <!-- 单选 -->
                     <el-radio-group v-if="q.type === 'SINGLE'" v-model="answers[q.questionId][0]"
                                     class="opt-group" @change="onAnswerChange(q.questionId)">
@@ -403,6 +406,7 @@ onBeforeUnmount(() => {
 .q-index { font-weight: 700; color: #909399; }
 .q-score { color: #909399; font-size: 12px; }
 .q-stem { line-height: 1.8; margin-bottom: 12px; white-space: pre-wrap; }
+.q-image { max-width: 100%; max-height: 320px; margin-bottom: 12px; border-radius: 4px; }
 .opt-group { display: flex; flex-direction: column; gap: 8px; }
 .opt { display: flex; margin-right: 0; height: auto; white-space: normal; }
 .blank-input { max-width: 420px; }

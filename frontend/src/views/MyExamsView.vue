@@ -26,6 +26,14 @@
                 <el-table-column label="题目 / 总分" width="120" align="center">
                     <template #default="{ row }">{{ row.questionCount }} 题 / {{ row.totalScore }} 分</template>
                 </el-table-column>
+                <el-table-column label="作答次数" width="110" align="center">
+                    <template #default="{ row }">
+                        <span :class="{ 'used-up': row.usedAttempts >= row.maxAttempt }">
+                            {{ row.usedAttempts }} / {{ row.maxAttempt }}
+                        </span>
+                        <div v-if="row.inProgress" class="sub in-progress">答题中</div>
+                    </template>
+                </el-table-column>
                 <el-table-column label="作答时长" width="100" align="center">
                     <template #default="{ row }">{{ row.duration }} 分钟</template>
                 </el-table-column>
@@ -35,12 +43,18 @@
                         <div class="sub">至 {{ row.endTime }}</div>
                     </template>
                 </el-table-column>
-                <el-table-column label="操作" width="140" align="center">
+                <el-table-column label="操作" width="210" align="center">
                     <template #default="{ row }">
                         <el-button v-if="row.canEnter" type="primary" size="small" @click="enterExam(row)">
-                            进入考试
+                            {{ row.inProgress ? '继续作答' : row.usedAttempts > 0 ? '再考一次' : '进入考试' }}
                         </el-button>
-                        <span v-else class="sub">{{ row.phase === 'NOT_STARTED' ? '未开始' : '已结束' }}</span>
+                        <el-button v-if="row.lastRecordId" link type="primary" size="small"
+                                   @click="$router.push(`/my-records/${row.lastRecordId}`)">
+                            查看成绩
+                        </el-button>
+                        <div v-if="!row.canEnter && !row.lastRecordId" class="sub">
+                            {{ row.phase === 'NOT_STARTED' ? '未开始' : '已结束' }}
+                        </div>
                     </template>
                 </el-table-column>
                 <template #empty>
@@ -85,4 +99,6 @@ onMounted(load)
 <style scoped>
 .mb-12 { margin-bottom: 12px; }
 .sub { font-size: 12px; color: #909399; line-height: 1.6; }
+.used-up { color: #e6a23c; font-weight: 600; }
+.in-progress { color: #67c23a; }
 </style>

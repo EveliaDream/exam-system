@@ -25,6 +25,9 @@
                             <el-tag size="small" :type="result.autoSubmitted ? 'warning' : 'success'">
                                 {{ result.autoSubmitted ? '超时自动交卷' : '主动交卷' }}
                             </el-tag>
+                            <el-tag v-if="result.attemptNo > 1" size="small" type="info" class="ml-4">
+                                第 {{ result.attemptNo }} 次作答
+                            </el-tag>
                         </el-descriptions-item>
                         <el-descriptions-item label="开始作答">{{ result.startTime }}</el-descriptions-item>
                         <el-descriptions-item label="交卷时间">{{ result.submitTime }}</el-descriptions-item>
@@ -95,6 +98,8 @@
                             <span v-if="q.submitCount" class="sub">修改 {{ q.submitCount }} 次</span>
                         </div>
                         <div class="q-stem">{{ q.stem }}</div>
+                        <el-image v-if="q.imageUrl" :src="q.imageUrl" fit="contain" class="q-image"
+                                  :preview-src-list="[q.imageUrl]" preview-teleported/>
                         <el-descriptions :column="1" size="small" border>
                             <el-descriptions-item label="你的答案">
                                 <span :class="q.correct ? 'ok' : 'bad'">{{ formatAnswer(q.studentAnswer) }}</span>
@@ -189,4 +194,5 @@ onMounted(load)
 .q-index { font-weight: 700; color: #909399; }
 .q-score { color: #909399; font-size: 12px; }
 .q-stem { line-height: 1.8; margin-bottom: 10px; white-space: pre-wrap; }
+.q-image { max-width: 100%; max-height: 280px; margin-bottom: 10px; border-radius: 4px; }
 </style>

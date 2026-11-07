@@ -80,19 +80,21 @@ public class ExcelService {
      * 「导出的数字」是同一套口径——如果另写一段统计逻辑，两边迟早不一致。
      */
     @Transactional(readOnly = true)
-    public ExcelFile exportScores(Long examId) {
-        ExamAnalyticsResponse data = analyticsService.analyzeExam(examId);
+    public ExcelFile exportScores(Long examId, Long classId) {
+        ExamAnalyticsResponse data = analyticsService.analyzeExam(examId, classId);
 
         try (XSSFWorkbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = wb.createSheet("成绩单");
             Styles styles = new Styles(wb);
 
             int rowIdx = 0;
-            // 标题
+            // 标题（按班级筛选时带上班级名，避免导出多份后分不清）
+            String titleText = data.title() + " 成绩单"
+                    + (data.className() == null ? "" : "（" + data.className() + "）");
             Row title = sheet.createRow(rowIdx++);
             title.setHeightInPoints(28);
             Cell titleCell = title.createCell(0);
-            titleCell.setCellValue(data.title() + " 成绩单");
+            titleCell.setCellValue(titleText);
             titleCell.setCellStyle(styles.title);
             sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 9));
 
@@ -157,7 +159,8 @@ public class ExcelService {
             wb.write(out);
             String safeTitle = (data.title() == null ? "考试" : data.title())
                     .replaceAll("[\\\\/:*?\"<>|]", "_");
-            return new ExcelFile(out.toByteArray(), safeTitle + "-成绩单.xlsx");
+            String suffix = data.className() == null ? "" : "-" + data.className().replaceAll("[\\\\/:*?\"<>|]", "_");
+            return new ExcelFile(out.toByteArray(), safeTitle + suffix + "-成绩单.xlsx");
         } catch (IOException e) {
             log.error("导出成绩单失败, examId={}", examId, e);
             throw BusinessException.of(ErrorCode.SYSTEM_ERROR, "导出失败，请稍后重试");
@@ -345,7 +348,7 @@ public class ExcelService {
         List<String> answer = parseAnswer(type, answerText, rawOptions);
 
         return new QuestionSaveRequest(type, stem, options, answer, score, difficulty,
-                analysis.isBlank() ? null : analysis, courseId, kpIds, true);
+                analysis.isBlank() ? null : analysis, null, courseId, kpIds, true);
     }
 
     private QuestionType parseType(String raw) {
